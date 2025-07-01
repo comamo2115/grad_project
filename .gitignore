@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# 데이터 파일 (용량이 크므로 제외)
+*.csv
+*.jsonl
+
+# macOS
+.DS_Store
