@@ -21,7 +21,7 @@ class AppTheme {
       // bodyText2: TextStyle(fontSize: 14, color: AppColors.textPrimary),
     ),
     colorScheme: ColorScheme.fromSwatch().copyWith(
-      secondary: AppColors.secondary,
+      secondary: const Color.fromARGB(255, 191, 99, 78),
     ),
   );
 }

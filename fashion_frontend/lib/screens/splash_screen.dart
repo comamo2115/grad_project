@@ -28,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     // 2. 로그인 상태에 따라 화면 이동
     if (isLoggedIn) {
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushReplacementNamed(context, '/root');
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }

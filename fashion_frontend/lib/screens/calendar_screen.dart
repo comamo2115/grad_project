@@ -1,10 +1,11 @@
-// // calendar_screen.dart
+// calendar_screen.dart
 
 // import 'dart:convert';
 // import 'package:flutter/material.dart';
 // import 'package:http/http.dart' as http;
 // import 'package:fashion_frontend/screens/add_schedule.dart';
 // import 'package:fashion_frontend/screens/modify_schedule.dart';
+// import 'package:fashion_frontend/widgets/bottom_nav.dart';
 
 // class CalendarScreen extends StatefulWidget {
 //   const CalendarScreen({Key? key}) : super(key: key);
@@ -54,6 +55,23 @@
 //   void dispose() {
 //     _scrollController.dispose();
 //     super.dispose();
+//   }
+
+//   void _goBackOrHome() {
+//     final localNavigator = Navigator.of(context);
+//     if (localNavigator.canPop()) {
+//       // 스택에 이전 페이지가 있으면 일반 pop
+//       localNavigator.pop();
+//       return;
+//     }
+//     // ★ 탭 루트에 있다면, 이미 떠 있는 BottomNavRoot 를 찾아 Home(0) 탭으로 전환
+//     final controller = BottomNavRoot.maybeOf(context);
+//     if (controller != null) {
+//       controller.switchTab(0); // 0 = Home
+//       return;
+//     }
+//     // ★ (예외) BottomNavRoot 문맥이 없을 때만 최후의 수단으로 /home 교체
+//     Navigator.of(context, rootNavigator: true).pushReplacementNamed('/home');
 //   }
 
 //   // 오늘 일정 로드
@@ -445,50 +463,6 @@
 //                           },
 //                         )),
 //           ),
-
-//           // 바텀 내비게이션
-//           Container(
-//             height: 60,
-//             color: const Color(0xFFBFB69B),
-//             child: Row(
-//               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-//               children: [
-//                 _buildNavItem(Icons.home, 'home', '/home', context),
-//                 _buildNavItem(
-//                   Icons.calendar_month,
-//                   'calendar',
-//                   '/calendar',
-//                   context,
-//                 ),
-//                 _buildNavItem(Icons.checkroom, 'wardrobe', '/closet', context),
-//                 _buildNavItem(Icons.person, 'profile', '/mypage', context),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   // 바텀 네비게이션 아이템
-//   Widget _buildNavItem(
-//     IconData icon,
-//     String label,
-//     String route,
-//     BuildContext context,
-//   ) {
-//     return GestureDetector(
-//       onTap: () {
-//         Navigator.pushNamed(context, route);
-//       },
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: [
-//           Icon(icon, color: Colors.white),
-//           Text(
-//             label,
-//             style: const TextStyle(fontSize: 12, color: Colors.white),
-//           ),
 //         ],
 //       ),
 //     );
@@ -501,6 +475,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:fashion_frontend/screens/add_schedule.dart';
 import 'package:fashion_frontend/screens/modify_schedule.dart';
+import 'package:fashion_frontend/widgets/bottom_nav.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({Key? key}) : super(key: key);
@@ -546,6 +521,24 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  // ★ Home 으로 돌아가기/혹은 팝: BottomNav 탭 안일 때는 루트 네비게이터에서 Home으로 교체
+  void _goBackOrHome() {
+    final localNavigator = Navigator.of(context);
+    if (localNavigator.canPop()) {
+      // 스택에 이전 페이지가 있으면 일반 pop
+      localNavigator.pop();
+      return;
+    }
+    // ★ 탭 루트에 있다면, 이미 떠 있는 BottomNavRoot 를 찾아 Home(0) 탭으로 전환
+    final controller = BottomNavRoot.maybeOf(context);
+    if (controller != null) {
+      controller.switchTab(0); // 0 = Home
+      return;
+    }
+    // ★ (예외) BottomNavRoot 문맥이 없을 때만 최후의 수단으로 /home 교체
+    Navigator.of(context, rootNavigator: true).pushReplacementNamed('/home');
   }
 
   // 말일 계산
@@ -688,10 +681,10 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // 뒤로가기 (필요하면 제거 가능)
+                // ★ 뒤로가기 → 탭 루트라면 Home 탭으로 전환
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: _goBackOrHome,
                 ),
                 const SizedBox(width: 8),
                 const Text(
@@ -740,11 +733,10 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
                 // Add Schedule 버튼: 화면 위에 push (fullscreenDialog로 상단 스택)
                 GestureDetector(
                   onTap: () async {
-                    // 상단에 쌓이도록 push → 완료 시 제목을 돌려받아 더미에 반영
                     final result = await Navigator.of(context).push<String>(
                       MaterialPageRoute(
                         builder: (_) => const AddScheduleScreen(),
-                        fullscreenDialog: true, // 화면 위에 겹치는 느낌
+                        fullscreenDialog: true,
                       ),
                     );
                     if (result != null && result.trim().isNotEmpty) {
@@ -805,7 +797,7 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
             ),
           ),
 
-          // 날짜 리스트(세로 스크롤) — 기본은 오늘 행이 보이도록
+          // 날짜 리스트(세로 스크롤)
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -826,7 +818,7 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
                     : '';
 
                 return InkWell(
-                  // 날짜 탭 시 수정 화면을 캘린더 위에 push (pop하면 돌아옴)
+                  // 날짜 탭 시 수정 화면을 캘린더 위에 push
                   onTap: () async {
                     await Navigator.of(context).push(
                       MaterialPageRoute(
@@ -842,7 +834,6 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
                         ),
                       ),
                     );
-                    // 돌아오면 오늘 요약 갱신(더미 기준)
                     _generateMockToday();
                     setState(() {});
                   },
@@ -895,48 +886,6 @@ class _CalendarScreenMockState extends State<CalendarScreen> {
                 );
               },
             ),
-          ),
-
-          // 바텀 내비게이션 (프로젝트 라우트에 맞게 사용)
-          Container(
-            height: 60,
-            color: const Color(0xFFBFB69B),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(Icons.home, 'home', '/home', context),
-                _buildNavItem(
-                  Icons.calendar_month,
-                  'calendar',
-                  '/calendar',
-                  context,
-                ),
-                _buildNavItem(Icons.checkroom, 'wardrobe', '/closet', context),
-                _buildNavItem(Icons.person, 'profile', '/mypage', context),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 바텀 네비게이션 아이템
-  Widget _buildNavItem(
-    IconData icon,
-    String label,
-    String route,
-    BuildContext context,
-  ) {
-    return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, route),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, color: Colors.white),
           ),
         ],
       ),
