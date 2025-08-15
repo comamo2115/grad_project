@@ -32,8 +32,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ★ 주의: 이 화면은 BottomNavRoot(탭 컨테이너) 안에 포함되어 사용됩니다.
-    //   -> 이 파일에서는 하단 네비게이션을 직접 그리지 않습니다.
+    // ★ 전체 요소를 아래로 내릴 오프셋(픽셀). 요청: 약 30
+    final double yOffset = 30.0;
+
     return Scaffold(
       backgroundColor: const Color(0xfffbfbfb),
       body: Stack(
@@ -43,13 +44,15 @@ class _HomeScreenState extends State<HomeScreen> {
             top: 0,
             left: 0,
             right: 0,
-            height: 167,
+            // ★ 내용이 30 내려가므로 높이를 167→167 + yOffset 로 확장
+            height: 167 + yOffset,
             child: Container(color: const Color(0xffbfb69b)),
           ),
 
           // 로고
           Positioned(
-            top: 25,
+            // ★ 25 → 25 + yOffset
+            top: 25 + yOffset,
             left: MediaQuery.of(context).size.width / 2 - 75,
             child: SizedBox(
               width: 150,
@@ -65,7 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // ★ 위치/날씨 정보 블록(전체가 터치 영역) → /weather 로 이동
           Positioned(
-            top: 80,
+            // ★ 80 → 80 + yOffset
+            top: 80 + yOffset,
             left: 12,
             right: 12,
             height: 41,
@@ -104,12 +108,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 오늘 일정 텍스트（탭 시 calendar 화면으로 이동 - 라우트 사용）
+          // 오늘 일정 텍스트（탭無効）
           Positioned(
-            top: 135,
+            // ★ 135 → 135 + yOffset
+            top: 135 + yOffset,
             left: MediaQuery.of(context).size.width / 2 - 133,
-            child: GestureDetector(
-              onTap: () => Navigator.pushNamed(context, '/calendar'),
+            child: IgnorePointer(
+              ignoring: true, // ★ 터치 무시
               child: const Text(
                 "Today’s plan : Team Meeting at 4pm",
                 style: TextStyle(
@@ -121,10 +126,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 추천 버튼
+          // 추천 버튼: 중앙 정렬 + 줄바꿈(Generate\nToday's Outfit) + 버튼 사이즈 확대
           Positioned(
-            top: 180,
-            left: MediaQuery.of(context).size.width / 2 - 100,
+            // ★ 180 → 180 + yOffset
+            top: 180 + yOffset,
+            left: 0, // ★ 좌우 0으로 두고
+            right: 0, // ★ Center로 자식(Container)을 중앙 배치
             child: GestureDetector(
               onTap: () {
                 // ★ MOCK: 버튼 탭 시 결과 표시
@@ -132,21 +139,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   isGenerated = true;
                 });
               },
-              child: Container(
-                width: 200,
-                height: 45,
-                decoration: BoxDecoration(
-                  color: const Color(0xffbf634e),
-                  borderRadius: BorderRadius.circular(15.0),
-                ),
-                child: const Center(
-                  child: Text(
-                    "Generate Today's Outfit",
-                    style: TextStyle(
-                      fontFamily: 'Futura',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xfff9f2ed),
+              child: Center(
+                child: Container(
+                  width: 260, // ★ 폭 약간 확대 (기존 200 → 260)
+                  height: 60, // ★ 높이 확대 (기존 45 → 60)
+                  decoration: BoxDecoration(
+                    color: const Color(0xffbf634e),
+                    borderRadius: BorderRadius.circular(18.0), // ★ 라운드 조금 키움
+                  ),
+                  child: const Center(
+                    child: Text(
+                      "Generate\nToday’s Outfit", // ★ 줄바꿈 적용
+                      textAlign: TextAlign.center, // ★ 가운데 정렬
+                      softWrap: true, // ★ 줄바꿈 허용
+                      maxLines: 2, // ★ 최대 2줄
+                      style: TextStyle(
+                        fontFamily: 'Futura',
+                        fontSize: 18, // ★ 글자 크기 약간 키움
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xfff9f2ed),
+                      ),
                     ),
                   ),
                 ),
@@ -157,7 +169,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // 추천 이미지/사유 표시 영역
           if (isGenerated) ...[
             Positioned(
-              top: 240,
+              // ★ 240 → 240 + yOffset
+              top: 260 + yOffset,
               left: 10,
               right: 10,
               child: Row(
@@ -165,8 +178,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: outfitImages
                     .map(
                       (img) => Container(
-                        width: 100,
-                        height: 100,
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
                           border: Border.all(color: const Color(0xffe3e3e3)),
                           borderRadius: BorderRadius.circular(10),
@@ -181,14 +194,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             Positioned(
-              top: 360,
+              // ★ 360 → 360 + yOffset
+              top: 780 + yOffset,
               left: MediaQuery.of(context).size.width / 2 - 140,
-              child: Text(
-                outfitReason,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Futura',
-                  color: Color(0xff707070),
+              child: Center(
+                child: Text(
+                  outfitReason,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Futura',
+                    color: Color(0xff707070),
+                  ),
                 ),
               ),
             ),
