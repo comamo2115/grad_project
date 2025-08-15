@@ -111,6 +111,17 @@ flutter:
     - assets/images/jacket.jpeg
     - assets/images/tshirt.jpeg
     - assets/images/dress.jpeg
+    - assets/images/4959.jpg
+    - assets/images/6394.jpg
+    - assets/images/10579.jpg
+    - assets/images/13090.jpg
+    - assets/images/14392.jpg
+    - assets/images/15970.jpg
+    - assets/images/19859.jpg
+    - assets/images/28540.jpg
+    - assets/images/39385.jpg
+    - assets/images/59435.jpg
+    # - assets/images
 
   #
   # For details regarding fonts from package dependencies,
