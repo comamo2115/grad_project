@@ -5,10 +5,27 @@ import 'dart:convert'; // ★ JSON 인/코딩
 import 'dart:async'; // ★ TimeoutException
 import 'dart:io'; // ★ Socket/Handshake 예외
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart'; // ★ 현재 위치 가져오기 (추가)
+import 'package:geocoding/geocoding.dart'; // ★ Open-Meteo 실패 시 대체 역지오코딩
+
+// ★ OpenWeather 키는 추천 API 페이로드용 현재 날씨 취득에 사용 (상단 표시엔 Open-Meteo 사용)
+const String kOpenWeatherApiKey = 'YOUR_OPENWEATHER_API_KEY';
 
 // ★ (가정) 서버가 추천해준 옷 ID를 실제 이미지 경로로 변환하는 함수
 // 실제 앱에서는 사용자 옷장 DB의 매핑 규칙에 맞게 구현하세요.
 String getImagePathFromId(int id) => 'assets/images/$id.jpg';
+
+// ★ 공백/Null 제외하고 ", "로 합치는 유틸
+String _joinPartsEn(Iterable<String?> parts) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final raw in parts) {
+    final s = (raw ?? '').trim();
+    if (s.isEmpty) continue;
+    if (seen.add(s)) out.add(s);
+  }
+  return out.join(', ');
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -18,16 +35,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // ★ 색상 상수 (홈 상단 날씨용)
+  static const Color accentRed = Color(0xFFBF634E); // ★ 최소(LOW) = 빨강
+  static const Color accentBlue = Color(0xFF2F67FF); // ★ 최고(HIGH) = 파랑
+
   // ----------------------------- 상태 -----------------------------
   bool isGenerated = false; // 추천 결과 표시 여부
   bool _isLoading = false; // 로딩 스피너
   String _errorMessage = ''; // 에러 메시지
 
-  // ★ 서버 응답으로 대체될 이미지 목록
-  // - 문자열 배열: "assets/...jpg" 또는 "https://..." 둘 다 허용
+  // ★ 추천 결과
   List<String> outfitImages = [];
-
-  // ★ 추천 사유(텍스트)
   String outfitReason = 'This is an outfit suitable for a meeting.';
 
   // ----------------------------- 설정 -----------------------------
@@ -35,19 +53,235 @@ class _HomeScreenState extends State<HomeScreen> {
   static const String _apiUrl =
       'https://11119ada0da0.ngrok-free.app/recommend_outfit';
 
+  // ----------------------------- 상단(현재 위치/날씨) 표시용 상태 -----------------------------
+  // ★ 도시명/현재/최고/최저/날씨코드
+  String _topCity = 'Locating...';
+  int? _topCurrent; // 현재 기온(°C)
+  int? _topHigh; // 오늘 최고(°C)
+  int? _topLow; // 오늘 최저(°C)
+  int? _topCode; // weathercode (Open-Meteo)
+
+  // ★ 화면 최초 진입 시 상단 날씨 로딩
+  @override
+  void initState() {
+    super.initState();
+    _loadHomeTopWeather();
+  }
+
+  // ----------------------------- 공통: 위치 권한/서비스 확인 -----------------------------
+  Future<Position> _determinePosition() async {
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw Exception('位置情報サービスが無効です（端末の設定で有効にしてください）');
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('位置情報の権限が拒否されました');
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      throw Exception('位置情報の権限が永久に拒否されています（設定から許可が必要）');
+    }
+
+    return Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.best,
+    );
+  }
+
+  // ----------------------------- Open-Meteo: 역지오코딩(영문 도시명) -----------------------------
+  // ★ 실패 시 'Current Location(failed)'
+  Future<String> _resolveCityNameEn(double lat, double lon) async {
+    // ---- ① Open-Meteo (language=en)
+    try {
+      final uri = Uri.parse(
+        'https://geocoding-api.open-meteo.com/v1/reverse'
+        '?latitude=$lat&longitude=$lon&language=en',
+      );
+      final res = await http
+          .get(uri, headers: {HttpHeaders.acceptHeader: 'application/json'})
+          .timeout(const Duration(seconds: 8));
+
+      if (res.statusCode == 200) {
+        final j = json.decode(res.body) as Map<String, dynamic>;
+        final results = (j['results'] as List?) ?? const [];
+        if (results.isNotEmpty) {
+          final r = results.first as Map<String, dynamic>;
+          final name = _joinPartsEn([
+            r['name'] as String?, // city
+            r['admin1'] as String?, // state/province
+            r['country'] as String?, // country
+          ]);
+          if (name.isNotEmpty) return name;
+        }
+      }
+    } catch (e) {
+      debugPrint('[reverse] Open-Meteo error: $e');
+    }
+
+    // ---- ② geocoding 패키지로 대체 (단말 로케일에 따를 수 있음)
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        lat,
+        lon,
+      ).timeout(const Duration(seconds: 6));
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        final name = _joinPartsEn([
+          p.locality, // city
+          p.administrativeArea, // state/province
+          p.country, // country
+        ]);
+        if (name.isNotEmpty) return name;
+      }
+    } catch (e) {
+      debugPrint('[reverse] geocoding error: $e');
+    }
+
+    // ---- ③ 최종 실패
+    return 'Current Location(failed)';
+  }
+
+  // ----------------------------- Open-Meteo: 현재/일일 데이터 -----------------------------
+  Future<Map<String, dynamic>> _fetchOpenMeteo(double lat, double lon) async {
+    final uri = Uri.parse(
+      'https://api.open-meteo.com/v1/forecast'
+      '?latitude=$lat'
+      '&longitude=$lon'
+      '&current=temperature_2m,weathercode'
+      '&daily=temperature_2m_max,temperature_2m_min'
+      '&timezone=auto',
+    );
+
+    final res = await http
+        .get(uri, headers: {HttpHeaders.acceptHeader: 'application/json'})
+        .timeout(const Duration(seconds: 8));
+
+    if (res.statusCode != 200) {
+      throw Exception('天気APIの呼び出しに失敗しました（${res.statusCode}）');
+    }
+    return json.decode(res.body) as Map<String, dynamic>;
+  }
+
+  // ----------------------------- 상단 날씨 로딩 -----------------------------
+  Future<void> _loadHomeTopWeather() async {
+    try {
+      final pos = await _determinePosition();
+      final city = await _resolveCityNameEn(pos.latitude, pos.longitude);
+      final data = await _fetchOpenMeteo(pos.latitude, pos.longitude);
+
+      // ★ 안전 추출
+      Map<String, dynamic> current = (data['current'] is Map)
+          ? (data['current'] as Map).cast<String, dynamic>()
+          : {};
+      Map<String, dynamic> daily = (data['daily'] is Map)
+          ? (data['daily'] as Map).cast<String, dynamic>()
+          : {};
+
+      final currTemp = (current['temperature_2m'] as num?)?.toDouble();
+      final currCode = (current['weathercode'] as num?)?.toInt();
+
+      final tmax =
+          (daily['temperature_2m_max'] as List?)?.cast<num>() ?? const [];
+      final tmin =
+          (daily['temperature_2m_min'] as List?)?.cast<num>() ?? const [];
+
+      setState(() {
+        _topCity = city;
+        _topCurrent = currTemp?.round();
+        _topHigh = tmax.isNotEmpty ? tmax.first.round() : null;
+        _topLow = tmin.isNotEmpty ? tmin.first.round() : null;
+        _topCode = currCode;
+      });
+    } catch (e) {
+      // 실패해도 화면이 죽지 않도록 도시만 실패 메시지 표기
+      setState(() {
+        _topCity = 'Current Location(failed)';
+        _topCurrent = null;
+        _topHigh = null;
+        _topLow = null;
+        _topCode = null;
+      });
+      debugPrint('Top weather load failed: $e');
+    }
+  }
+
+  // ----------------------------- (기존) OpenWeather: 추천 페이로드용 현재 날씨 -----------------------------
+  Future<Map<String, dynamic>> _getCurrentWeather() async {
+    // ★ 위치 서비스/권한 확인
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      throw 'Location services are disabled.';
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw 'Location permission denied.';
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      throw 'Location permission permanently denied.';
+    }
+
+    // ★ 현재 좌표
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.medium,
+    );
+
+    // ★ OpenWeatherMap 호출 (units=metric → 섭씨)
+    final url = Uri.parse(
+      'https://api.openweathermap.org/data/2.5/weather'
+      '?lat=${pos.latitude}&lon=${pos.longitude}'
+      '&appid=$kOpenWeatherApiKey&units=metric',
+    );
+
+    final res = await http.get(url).timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200) {
+      throw 'Weather API error: HTTP ${res.statusCode}';
+    }
+
+    final data = json.decode(res.body);
+    final double? tempC = (data['main']?['temp'] as num?)?.toDouble();
+    final String? condition =
+        (data['weather'] is List && data['weather'].isNotEmpty)
+        ? (data['weather'][0]['main'] as String?)
+        : null;
+
+    if (tempC == null || condition == null) {
+      throw 'Invalid weather response.';
+    }
+
+    return {'temperature': tempC, 'condition': condition};
+  }
+
   // ----------------------------- 네비게이션 -----------------------------
   Future<void> _openWeather() async {
     await Navigator.of(context, rootNavigator: true).pushNamed('/weather');
   }
 
-  // ----------------------------- API 호출 -----------------------------
+  // ----------------------------- 추천 API 호출 -----------------------------
   Future<void> _getOutfitRecommendation() async {
-    // ★ UI 상태 초기화
     setState(() {
       _isLoading = true;
       _errorMessage = '';
       isGenerated = false;
     });
+
+    double sendTemp = 22.0; // ★ 실패 시 폴백
+    String sendCond = 'Clear'; // ★ 실패 시 폴백
+
+    try {
+      // ★ 1) 현재 날씨 취득(OpenWeather) → 추천 엔진에 전달
+      final w = await _getCurrentWeather();
+      sendTemp = (w['temperature'] as double?) ?? sendTemp;
+      sendCond = (w['condition'] as String?) ?? sendCond;
+    } catch (e) {
+      debugPrint('Weather fetch failed: $e');
+    }
 
     try {
       // ★ 예시 요청 페이로드(서버 스펙에 맞춰 수정 가능)
@@ -65,12 +299,11 @@ class _HomeScreenState extends State<HomeScreen> {
           6394,
         ],
         "event": "Casual Day Out",
-        "temperature": 22.0,
-        "condition": "Clear",
+        "temperature": sendTemp, // ★ 실제 현재 기온(섭씨)
+        "condition": sendCond, // ★ 실제 현재 날씨(main)
         "gender": "Men",
       };
 
-      // ★ POST + 타임아웃
       final res = await http
           .post(
             Uri.parse(_apiUrl),
@@ -80,13 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .timeout(const Duration(seconds: 15));
 
       if (res.statusCode == 200) {
-        // ★ 한글/UTF-8 안전 디코딩
         final body = json.decode(utf8.decode(res.bodyBytes));
-
-        // ★ 예상되는 응답 케이스를 광범위하게 처리
-        // 1) { best_combination: { ids: [int, ...], description: "..." } }
-        // 2) { ids: [...], description: "..." }
-        // 3) { image_urls: ["https://..."] }
         final combo = body['best_combination'];
         List<dynamic>? idsDyn;
         List<dynamic>? urlsDyn;
@@ -101,10 +328,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (body['description'] is String) desc = body['description'];
         }
 
-        // ★ 이미지 경로 변환 로직
         final List<String> imagePaths = [];
         if (idsDyn is List && idsDyn.isNotEmpty) {
-          // 정수 ID -> assets 경로로 매핑
           for (final v in idsDyn) {
             if (v is int) imagePaths.add(getImagePathFromId(v));
             if (v is String && int.tryParse(v) != null) {
@@ -112,7 +337,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         } else if (urlsDyn is List && urlsDyn.isNotEmpty) {
-          // 서버가 직접 URL을 내려주는 경우
           for (final v in urlsDyn) {
             if (v is String) imagePaths.add(v);
           }
@@ -164,6 +388,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ----------------------------- weathercode → 아이콘 -----------------------------
+  IconData _iconFromWeatherCode(int? code) {
+    if (code == null) return Icons.cloud_outlined;
+    if (code == 0) return Icons.wb_sunny_outlined;
+    if (code == 1 || code == 2 || code == 3) return Icons.cloud_outlined;
+    if (code == 45 || code == 48) return Icons.blur_on; // 안개 대체
+    if (code >= 51 && code <= 67) return Icons.grain; // 이슬비/비
+    if (code >= 71 && code <= 77) return Icons.ac_unit; // 눈
+    if (code >= 80 && code <= 82) return Icons.cloud_queue; // 소나기
+    if (code == 95 || code == 96 || code == 99) return Icons.thunderstorm; // 뇌우
+    return Icons.wb_cloudy_outlined;
+  }
+
   // ----------------------------- UI -----------------------------
   @override
   Widget build(BuildContext context) {
@@ -212,26 +449,86 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(20.0),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Icon(Icons.location_on, size: 16, color: Color(0xffbf634e)),
-                    SizedBox(width: 4),
-                    Text(
-                      'busan',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontFamily: 'Futura',
-                        color: Color(0xff707070),
+                    // -------------------- 위치명 (왼쪽) --------------------
+                    const Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: Color(0xffbf634e),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        _topCity,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontFamily: 'Futura',
+                          color: Color.fromARGB(255, 0, 0, 0),
+                        ),
                       ),
                     ),
-                    SizedBox(width: 16),
-                    Icon(Icons.cloud, size: 16, color: Color(0xffbf634e)),
-                    SizedBox(width: 4),
+
+                    // -------------------- 현재기온 + 아이콘（アイコンは現在気温の右） --------------------
+                    const SizedBox(width: 12),
                     Text(
-                      '30°C / 23°C',
-                      style: TextStyle(fontSize: 12, fontFamily: 'Futura'),
+                      _topCurrent != null ? '${_topCurrent}°C' : '—',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Futura',
+                        color: Color(0xff0d0d0d),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      _iconFromWeatherCode(_topCode),
+                      size: 16,
+                      color: const Color(0xffbf634e),
+                    ),
+
+                    // -------------------- 최고/최저（最低=赤 / 最高=青） --------------------
+                    const SizedBox(width: 12),
+                    if (_topHigh != null || _topLow != null)
+                      Row(
+                        children: [
+                          if (_topLow != null) ...[
+                            const SizedBox(width: 2),
+                            Text(
+                              '${_topLow}°C',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Futura',
+                                color: accentRed, // ★ 최저=빨강
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                          if (_topHigh != null && _topLow != null)
+                            const Text(
+                              '  /  ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Futura',
+                                color: Color(0xff707070),
+                              ),
+                            ),
+                          if (_topHigh != null) ...[
+                            const SizedBox(width: 2),
+                            Text(
+                              '${_topHigh}°C',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontFamily: 'Futura',
+                                color: accentBlue, // ★ 최고=파랑
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                   ],
                 ),
               ),
@@ -306,24 +603,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
           // 추천 이미지/사유
-          // ★ 추천 이미지/사유 (Wrap으로 줄바꿈/자동 배치)
-          // 기존의 ① 이미지 Row Positioned, ② 사유 텍스트 Positioned 를 이 하나로 교체하세요.
           if (isGenerated) ...[
             Positioned(
               top: 260 + yOffset,
               left: 10,
               right: 10,
-              // bottom 을 주지 않아 내용 높이에 맞춰 자동으로 확장됩니다.
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // ★ Wrap: 한 줄을 넘으면 자동으로 다음 줄에 배치
                   Wrap(
-                    alignment: WrapAlignment.spaceEvenly, // ★ 좌우 여백을 고르게
-                    spacing: 12, // ★ 가로 간격
-                    runSpacing: 12, // ★ 줄(세로) 간격
+                    alignment: WrapAlignment.spaceEvenly,
+                    spacing: 12,
+                    runSpacing: 12,
                     children: outfitImages.map((img) {
-                      // ★ 네트워크/에셋 모두 지원
                       final ImageProvider provider = img.startsWith('http')
                           ? NetworkImage(img)
                           : AssetImage(img) as ImageProvider;
@@ -343,7 +635,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 24),
-                  // ★ 추천 사유 텍스트: 이미지들 아래에 자연스럽게 배치
                   SizedBox(
                     width: 280,
                     child: Text(
@@ -366,220 +657,3 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// // home_screen.dart
-// import 'package:flutter/material.dart';
-// import 'package:flutter_svg/flutter_svg.dart';
-
-// class HomeScreen extends StatefulWidget {
-//   const HomeScreen({Key? key}) : super(key: key);
-
-//   @override
-//   State<HomeScreen> createState() => _HomeScreenState();
-// }
-
-// class _HomeScreenState extends State<HomeScreen> {
-//   bool isGenerated = false;
-
-//   // ★ 코디 추천 이미지(예시)
-//   final List<String> outfitImages = [
-//     'assets/images/jacket.jpeg',
-//     'assets/images/tshirt.jpeg',
-//     'assets/images/dress.jpeg',
-//   ];
-
-//   // ★ 코디 추천 사유(예시)
-//   final String outfitReason = 'This is an outfit suitable for a meeting.';
-
-//   // ★ (옵션) /weather 에서 돌아온 뒤 갱신이 필요하면 여기서 setState 호출
-//   Future<void> _openWeather() async {
-//     // '/weather' 화면으로 이동 → 닫히면 여기로 복귀
-//     await Navigator.of(context, rootNavigator: true).pushNamed('/weather');
-//     // TODO: 날씨 재조회가 필요하면 아래 주석 해제
-//     // setState(() {});
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // ★ 전체 요소를 아래로 내릴 오프셋(픽셀). 요청: 약 30
-//     final double yOffset = 30.0;
-
-//     return Scaffold(
-//       backgroundColor: const Color(0xfffbfbfb),
-//       body: Stack(
-//         children: [
-//           // 상단 배경
-//           Positioned(
-//             top: 0,
-//             left: 0,
-//             right: 0,
-//             // ★ 내용이 30 내려가므로 높이를 167→167 + yOffset 로 확장
-//             height: 167 + yOffset,
-//             child: Container(color: const Color(0xffbfb69b)),
-//           ),
-
-//           // 로고
-//           Positioned(
-//             // ★ 25 → 25 + yOffset
-//             top: 25 + yOffset,
-//             left: MediaQuery.of(context).size.width / 2 - 75,
-//             child: SizedBox(
-//               width: 150,
-//               child: Center(
-//                 child: Image.asset(
-//                   'assets/images/outfitter_logo2.png',
-//                   fit: BoxFit.contain,
-//                   height: 60,
-//                 ),
-//               ),
-//             ),
-//           ),
-
-//           // ★ 위치/날씨 정보 블록(전체가 터치 영역) → /weather 로 이동
-//           Positioned(
-//             // ★ 80 → 80 + yOffset
-//             top: 80 + yOffset,
-//             left: 12,
-//             right: 12,
-//             height: 41,
-//             child: GestureDetector(
-//               onTap: _openWeather, // ★ 블록 전체 탭 시 이동
-//               child: Container(
-//                 decoration: BoxDecoration(
-//                   color: const Color(0xfff9f2ed),
-//                   borderRadius: BorderRadius.circular(20.0),
-//                 ),
-//                 // ★ 내부에 아이콘+텍스트를 같은 블록 안에 배치
-//                 padding: const EdgeInsets.symmetric(horizontal: 20),
-//                 child: Row(
-//                   crossAxisAlignment: CrossAxisAlignment.center,
-//                   children: const [
-//                     Icon(Icons.location_on, size: 16, color: Color(0xffbf634e)),
-//                     SizedBox(width: 4),
-//                     Text(
-//                       'busan',
-//                       style: TextStyle(
-//                         fontSize: 12,
-//                         fontFamily: 'Futura',
-//                         color: Color(0xff707070),
-//                       ),
-//                     ),
-//                     SizedBox(width: 16),
-//                     Icon(Icons.cloud, size: 16, color: Color(0xffbf634e)),
-//                     SizedBox(width: 4),
-//                     Text(
-//                       '30°C / 23°C',
-//                       style: TextStyle(fontSize: 12, fontFamily: 'Futura'),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//           ),
-
-//           // 오늘 일정 텍스트（탭無効）
-//           Positioned(
-//             // ★ 135 → 135 + yOffset
-//             top: 135 + yOffset,
-//             left: MediaQuery.of(context).size.width / 2 - 133,
-//             child: IgnorePointer(
-//               ignoring: true, // ★ 터치 무시
-//               child: const Text(
-//                 "Today’s plan : Team Meeting at 4pm",
-//                 style: TextStyle(
-//                   fontFamily: 'Futura',
-//                   fontSize: 16,
-//                   color: Color(0xfff9f2ed),
-//                 ),
-//               ),
-//             ),
-//           ),
-
-//           // 추천 버튼: 중앙 정렬 + 줄바꿈(Generate\nToday's Outfit) + 버튼 사이즈 확대
-//           Positioned(
-//             // ★ 180 → 180 + yOffset
-//             top: 180 + yOffset,
-//             left: 0, // ★ 좌우 0으로 두고
-//             right: 0, // ★ Center로 자식(Container)을 중앙 배치
-//             child: GestureDetector(
-//               onTap: () {
-//                 // ★ MOCK: 버튼 탭 시 결과 표시
-//                 setState(() {
-//                   isGenerated = true;
-//                 });
-//               },
-//               child: Center(
-//                 child: Container(
-//                   width: 260, // ★ 폭 약간 확대 (기존 200 → 260)
-//                   height: 60, // ★ 높이 확대 (기존 45 → 60)
-//                   decoration: BoxDecoration(
-//                     color: const Color(0xffbf634e),
-//                     borderRadius: BorderRadius.circular(18.0), // ★ 라운드 조금 키움
-//                   ),
-//                   child: const Center(
-//                     child: Text(
-//                       "Generate\nToday’s Outfit", // ★ 줄바꿈 적용
-//                       textAlign: TextAlign.center, // ★ 가운데 정렬
-//                       softWrap: true, // ★ 줄바꿈 허용
-//                       maxLines: 2, // ★ 최대 2줄
-//                       style: TextStyle(
-//                         fontFamily: 'Futura',
-//                         fontSize: 18, // ★ 글자 크기 약간 키움
-//                         fontWeight: FontWeight.bold,
-//                         color: Color(0xfff9f2ed),
-//                       ),
-//                     ),
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
-
-//           // 추천 이미지/사유 표시 영역
-//           if (isGenerated) ...[
-//             Positioned(
-//               // ★ 240 → 240 + yOffset
-//               top: 260 + yOffset,
-//               left: 10,
-//               right: 10,
-//               child: Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-//                 children: outfitImages
-//                     .map(
-//                       (img) => Container(
-//                         width: 120,
-//                         height: 120,
-//                         decoration: BoxDecoration(
-//                           border: Border.all(color: const Color(0xffe3e3e3)),
-//                           borderRadius: BorderRadius.circular(10),
-//                           image: DecorationImage(
-//                             image: AssetImage(img),
-//                             fit: BoxFit.cover,
-//                           ),
-//                         ),
-//                       ),
-//                     )
-//                     .toList(),
-//               ),
-//             ),
-//             Positioned(
-//               // ★ 360 → 360 + yOffset
-//               top: 780 + yOffset,
-//               left: MediaQuery.of(context).size.width / 2 - 140,
-//               child: Center(
-//                 child: Text(
-//                   outfitReason,
-//                   style: const TextStyle(
-//                     fontSize: 14,
-//                     fontFamily: 'Futura',
-//                     color: Color(0xff707070),
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ],
-//         ],
-//       ),
-//     );
-//   }
-// }
