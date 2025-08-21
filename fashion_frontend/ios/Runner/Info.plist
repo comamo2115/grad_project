@@ -46,6 +46,8 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app uses GPS to get current location.</string>
+	<string>We use your location to show local weather.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>We use your location to show local weather even in background.</string>
 </dict>
 </plist>
