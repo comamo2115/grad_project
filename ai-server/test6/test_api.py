@@ -2,64 +2,10 @@ import requests
 import json
 import time
 
-# API 서버 주소 (Colab에서 생성된 ngrok 주소로 교체, 예: "https://your-ngrok-url.ngrok-free.app")
-API_URL = "https://a3445d597d22.ngrok-free.app/recommend_outfit"  # 실제 ngrok URL로 업데이트
+# API 서버 주소
+API_URL = "https://6aaf054e87f4.ngrok-free.app/recommend_outfit"  # 실제 ngrok URL로 업데이트
 
-# styles.csv에서 추출된 아이템 ID와 설명 (여기서는 문서에서 제공된 일부 샘플 사용, 실제로는 전체 CSV 로드 추천)
-# 실제 사용 시: import pandas as pd; df = pd.read_csv('styles.csv'); 로 필터링
-SAMPLE_ITEMS = {
-    # Casual Summer Women (Beach Trip 등)
-    59263: "Women Silver Watch (Casual, Winter)",  # Accessory
-    21379: "Men Black Track Pants (Casual, Fall)",  # 하지만 Women 시나리오에 맞게 필터
-    39386: "Men Blue Jeans (Casual, Summer)",
-    53759: "Men Grey T-shirt (Casual, Summer)",
-    47957: "Women Blue Handbag (Casual, Summer)",
-    59051: "Women Black Flats (Casual, Winter)",
-    20099: "Women Green Kurta (Ethnic, Fall)",
-    58183: "Women White Handbag (Casual, Summer)",
-    3954: "Women Pink T-shirt (Casual, Summer)",
-    # Formal Men (Business Meeting 등)
-    15970: "Men Navy Blue Shirt (Casual, Fall)",  # Casual이지만 Shirt
-    9036: "Men Black Formal Shoes (Formal, Winter)",
-    19859: "Men Olive Jacket (Casual, Fall)",  # Outer
-    13088: "Men Grey Sweatshirt (Sports, Fall)",  # Adjust
-    10579: "Men Purple Shirt (Formal, Fall)",
-    4959: "Boys Green T-shirt (Casual, Summer)",
-    14392: "Men Black Track Pants (Sports, Fall)",
-    28540: "Women Beige Kurta (Ethnic, Summer)",
-    1164: "Men Blue T-shirt (Sports, Summer)",
-    59435: "Men Black Formal Shoes (Formal, Summer)",
-    # Winter Women (Winter Walk 등)
-    5649: "Women Black Top (Casual, Winter)",  # 가정
-    13090: "Men Navy Blue Tracksuit (Sports, Fall)",
-    6394: "Men Black Casual Shoes (Casual, Summer)",
-    # Gym Men
-    53759: "Men Grey T-shirt (Casual, Summer)",
-    1855: "Men Grey T-shirt (Casual, Summer)",
-    21379: "Men Black Track Pants (Casual, Fall)",
-    15517: "Men Red Casual Shoes (Casual, Fall)",
-    5375: "Men White Polo T-shirt (Sports, Summer)",
-    14346: "Men Blue Shorts (Sports, Fall)",
-    39386: "Men Blue Jeans (Casual, Summer)",
-    # Additional for Formal Dinner Women
-    5649: "Women Black Dress (Formal, Summer)",  # 가정, 실제 df에서 Dress 선택
-    1164: "Women Blue Top (Casual, Summer)",
-    19859: "Women Olive Blazer (Formal, Fall)",
-    13090: "Women Navy Skirt (Casual, Fall)",
-    6394: "Women Black Heels (Formal, Winter)",
-    # Summer Vacation Men
-    58004: "Men White T-shirt (Casual, Summer)",  # 가정
-    2154: "Men Blue Shorts (Casual, Summer)",
-    34091: "Girls Black Top (Casual, Summer)",
-    55573: "Men Grey Pants (Casual, Fall)",
-    15517: "Men Red Shoes (Casual, Fall)",
-    6394: "Men Black Shoes (Casual, Summer)",
-    9036: "Men Black Formal Shoes (Formal, Winter)",
-    13088: "Men Grey Sweatshirt (Sports, Fall)",
-    19859: "Men Olive Jacket (Casual, Fall)"
-}
-
-# 시나리오 정의: 각 시나리오에 맞는 closet 아이템 ID 리스트 (styles.csv 기반으로 적합한 것 선택)
+# --- 기본 시나리오 (1~6 + 추가 7,8) ---
 TEST_SCENARIOS = [
     {
         "name": "시나리오 1: 더운 여름날 데이트 (Beach Trip, Sunny, 32°C, Women)",
@@ -67,7 +13,7 @@ TEST_SCENARIOS = [
         "temperature": 32.0,
         "condition": "Sunny",
         "gender": "Women",
-        "closet": [59263, 47957, 59051, 20099, 58183, 3954, 28540, 34091]  # Summer Casual Women items
+        "closet": [59263, 47957, 59051, 20099, 58183, 3954, 28540, 34091]
     },
     {
         "name": "시나리오 2: 쌀쌀한 가을 비즈니스 미팅 (Business Meeting, Cloudy, 15°C, Men)",
@@ -75,7 +21,7 @@ TEST_SCENARIOS = [
         "temperature": 15.0,
         "condition": "Cloudy",
         "gender": "Men",
-        "closet": [15970, 10579, 9036, 59435, 19859, 13088, 14392, 1164, 10257]  # Formal/Fall Men items
+        "closet": [15970, 10579, 9036, 59435, 19859, 13088, 14392, 1164, 10257]
     },
     {
         "name": "시나리오 3: 추운 겨울 공원 산책 (Winter Walk, Snowy, -2°C, Women)",
@@ -83,7 +29,7 @@ TEST_SCENARIOS = [
         "temperature": -2.0,
         "condition": "Snowy",
         "gender": "Women",
-        "closet": [19859, 9036, 13088, 28540, 59051, 20099, 48123]  # Winter/Casual Women with outer
+        "closet": [19859, 9036, 13088, 28540, 59051, 20099, 48123]
     },
     {
         "name": "시나리오 4: 격식 있는 저녁 식사 (Formal Dinner, Clear, 22°C, Women)",
@@ -91,7 +37,7 @@ TEST_SCENARIOS = [
         "temperature": 22.0,
         "condition": "Clear",
         "gender": "Women",
-        "closet": [20099, 19859, 6394, 9036, 1164, 13090, 5649]  # Formal/Ethnic Women items
+        "closet": [20099, 19859, 6394, 9036, 1164, 13090, 5649]
     },
     {
         "name": "시나리오 5: 계절 불일치 (여름에 겨울 옷) (Summer Vacation, Sunny, 35°C, Men)",
@@ -99,7 +45,7 @@ TEST_SCENARIOS = [
         "temperature": 35.0,
         "condition": "Sunny",
         "gender": "Men",
-        "closet": [53759, 39386, 6394, 15517, 2154, 34091, 58004]  # Mix Summer and some Winter to test mismatch
+        "closet": [53759, 39386, 6394, 15517, 2154, 34091, 58004]
     },
     {
         "name": "시나리오 6: 운동복 추천 (Gym Workout, Clear, 20°C, Men)",
@@ -107,9 +53,8 @@ TEST_SCENARIOS = [
         "temperature": 20.0,
         "condition": "Clear",
         "gender": "Men",
-        "closet": [53759, 21379, 15517, 1855, 5375, 14346, 39386, 17624]  # Sports/Active Men items
+        "closet": [53759, 21379, 15517, 1855, 5375, 14346, 39386, 17624]
     },
-    # 추가 시나리오: 더 다양한 테스트
     {
         "name": "시나리오 7: 캐주얼 산책 (Casual Day Out, Rainy, 18°C, Women)",
         "event": "Casual Day Out",
@@ -128,6 +73,58 @@ TEST_SCENARIOS = [
     }
 ]
 
+# --- 추가 시나리오 (scenario7_data ~ scenario12_data) ---
+scenario9_data = {  # Temperature change (Men Casual)
+    "closet": [4404, 5865, 15528, 11371, 17198, 59106, 32768, 1855, 8580, 17199,
+               11346, 39386, 16508, 14121, 36444, 30233, 24250, 3560],
+    "event": "Casual Day Out", "temperature": 20.0, "condition": "Clear", "gender": "Men"
+}
+
+scenario10_data = {  # Temperature change (Women Formal/Smart Casual)
+    "closet": [27884, 18889, 44672, 27888, 18763, 43522, 32405, 27267,
+               32404, 18712, 34455, 34069, 23797, 59018],
+    "event": "Business Meeting", "temperature": 10.0, "condition": "Clear", "gender": "Women"
+}
+
+scenario11_data = {  # Schedule change (Men Summer)
+    "closet": [43500, 30748, 33248, 39414, 7505, 5435, 39405, 52023, 56854,
+               43960, 53761, 39381, 30735, 26138, 51332, 28495, 5599, 11919,
+               41861, 49495, 45604, 4181, 4524],
+    "event": "Casual Day Out", "temperature": 28.0, "condition": "Clear", "gender": "Men"
+}
+
+scenario12_data = {  # Temperature change (Women Summer)
+    "closet": [3701, 40385, 28697, 28836, 27887, 26365, 44680, 44670, 32641,
+               7483, 31454, 9785, 27918, 30895, 30924, 50949, 27011, 4980,
+               39897, 33697, 4101, 4147, 45340, 15492, 35783, 38652],
+    "event": "Casual Day Out", "temperature": 28.0, "condition": "Clear", "gender": "Women"
+}
+
+scenario13_data = {  # Color check (Men Fall Casual)
+    "closet": [19547, 19549, 19327, 18864, 15586, 18863, 19548, 23139, 23539,
+               14581, 21379, 34204, 12538, 7133, 7136, 7890, 22198, 26538,
+               54543, 19772, 24259, 14497, 35465, 12823, 9211],
+    "event": "Casual Day Out", "temperature": 15.0, "condition": "Clear", "gender": "Men"
+}
+
+scenario14_data = {  # Color check (Women Fall Casual)
+    "closet": [20233, 14091, 13961, 20347, 15038, 18727, 15036, 11096, 11447,
+               14092, 7193, 51605, 51602, 7192, 39124, 39125, 13304, 2954,
+               8499, 17929, 43309, 22462, 3505, 12905, 12902, 13555, 15267, 15269],
+    "event": "Casual Day Out", "temperature": 15.0, "condition": "Clear", "gender": "Women"
+}
+
+# 추가 시나리오를 TEST_SCENARIOS에 append
+TEST_SCENARIOS.extend([
+    {"name": "시나리오 9: Temperature Change (Men Casual)", **scenario9_data},
+    {"name": "시나리오 10: Temperature Change (Women Formal/Smart Casual)", **scenario10_data},
+    {"name": "시나리오 11: Schedule Change (Men Summer)", **scenario11_data},
+    {"name": "시나리오 12: Temperature Change (Women Summer)", **scenario12_data},
+    {"name": "시나리오 13: Color Check (Men Fall Casual)", **scenario13_data},
+    {"name": "시나리오 14: Color Check (Women Fall Casual)", **scenario14_data},
+])
+
+# --- API 호출 함수 ---
 def test_api(scenario):
     payload = {
         "closet": scenario["closet"],
@@ -139,7 +136,7 @@ def test_api(scenario):
     start_time = time.time()
     response = requests.post(API_URL, json=payload)
     end_time = time.time()
-    
+
     if response.status_code == 200:
         result = response.json()
         print(f"--- 테스트 시나리오: {scenario['name']} ---")
