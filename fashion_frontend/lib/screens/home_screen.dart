@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String outfitReason = 'This is an outfit suitable for a meeting.';
 
   static const String _apiUrl =
-      'https://11119ada0da0.ngrok-free.app/recommend_outfit';
+      'https://58fea4bf219d.ngrok-free.app/recommend_outfit';
 
   String _topCity = 'Locating...';
   int? _topCurrent;
@@ -257,76 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return "Unisex";
   }
 
-  // 　⭐️MOCK⭐️
-  Future<void> _getOutfitRecommendation() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-      isGenerated = false;
-    });
-
-    // OpenMeteo で取得済みの値を利用
-    double sendTemp = (_topCurrent ?? 22).toDouble();
-    String sendCond = _conditionFromWeatherCode(_topCode);
-
-    List<Map<String, dynamic>> closet = [];
-    String event = "No schedule";
-    String gender = "Unisex";
-
-    try {
-      closet = await _fetchCloset();
-      event = await _fetchTodayEvent();
-      gender = await _fetchUserGender();
-    } catch (e) {
-      debugPrint("fetch data failed: $e");
-    }
-
-    final requestData = {
-      "closet": closet,
-      "event": event,
-      "temperature": sendTemp,
-      "condition": sendCond,
-      "gender": gender,
-    };
-    debugPrint("MOCK sending payload: $requestData");
-
-    // ★ 疑似レスポンス
-    final Map<String, dynamic> mockResponse = {
-      "ids": [925167, 350874],
-      "reason": "Rainy day → darker Tshirts recommended!",
-    };
-
-    final List<dynamic> idsDyn = (mockResponse["ids"] as List?) ?? [];
-    final String reason =
-        mockResponse["reason"] as String? ?? "No reason provided";
-
-    // closet から該当 id の服を探す
-    final matchedItems = closet.where((item) {
-      final id = item["id"];
-      return id != null && idsDyn.contains(id);
-    }).toList();
-
-    setState(() {
-      outfitImages = matchedItems
-          .map((item) => item["image"] as String? ?? "")
-          .toList();
-
-      outfitReason =
-          reason +
-          "\n\nRecommended: " +
-          matchedItems
-              .map(
-                (item) =>
-                    "${item["baseColor"] ?? ''} ${item["articleType"] ?? ''}",
-              )
-              .join(", ");
-
-      isGenerated = true;
-      _isLoading = false;
-    });
-  }
-
-  // ⭐️⭐️⭐️️AIサーバー接続版⭐️⭐️⭐️
+  // // 　⭐️MOCK⭐️
   // Future<void> _getOutfitRecommendation() async {
   //   setState(() {
   //     _isLoading = true;
@@ -334,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
   //     isGenerated = false;
   //   });
 
-  //   // OpenMeteoで取得済みのUI値を利用
+  //   // OpenMeteo で取得済みの値を利用
   //   double sendTemp = (_topCurrent ?? 22).toDouble();
   //   String sendCond = _conditionFromWeatherCode(_topCode);
 
@@ -357,55 +288,125 @@ class _HomeScreenState extends State<HomeScreen> {
   //     "condition": sendCond,
   //     "gender": gender,
   //   };
-  //   debugPrint("sending payload: $requestData");
+  //   debugPrint("MOCK sending payload: $requestData");
 
-  //   try {
-  //     final res = await http
-  //         .post(
-  //           Uri.parse(_apiUrl), // ★ ngrok/서버 주소
-  //           headers: {'Content-Type': 'application/json'},
-  //           body: json.encode(requestData),
-  //         )
-  //         .timeout(const Duration(seconds: 15));
+  //   // ★ 疑似レスポンス
+  //   final Map<String, dynamic> mockResponse = {
+  //     "ids": [925167, 350874],
+  //     "reason": "Rainy day → darker Tshirts recommended!",
+  //   };
 
-  //     if (res.statusCode == 200) {
-  //       final body = json.decode(utf8.decode(res.bodyBytes));
+  //   final List<dynamic> idsDyn = (mockResponse["ids"] as List?) ?? [];
+  //   final String reason =
+  //       mockResponse["reason"] as String? ?? "No reason provided";
 
-  //       // ★ サーバーが {"ids":[..],"reason":"..."} を返す想定
-  //       final List<dynamic> idsDyn = body['ids'] ?? [];
-  //       final String reason = body['reason'] ?? "No reason provided";
+  //   // closet から該当 id の服を探す
+  //   final matchedItems = closet.where((item) {
+  //     final id = item["id"];
+  //     return id != null && idsDyn.contains(id);
+  //   }).toList();
 
-  //       // closet から該当 id の服を探す
-  //       final matchedItems = closet.where((item) {
-  //         return idsDyn.contains(item["id"]);
-  //       }).toList();
+  //   setState(() {
+  //     outfitImages = matchedItems
+  //         .map((item) => item["image"] as String? ?? "")
+  //         .toList();
 
-  //       setState(() {
-  //         outfitImages = matchedItems
-  //             .map((item) => item["image"] as String)
-  //             .toList();
-  //         outfitReason =
-  //             reason +
-  //             "\n\nRecommended: " +
-  //             matchedItems
-  //                 .map((item) => "${item["baseColor"]} ${item["articleType"]}")
-  //                 .join(", ");
-  //         isGenerated = true;
-  //         _isLoading = false;
-  //       });
-  //     } else {
-  //       setState(() {
-  //         _errorMessage = 'server error: ${res.statusCode}';
-  //         _isLoading = false;
-  //       });
-  //     }
-  //   } catch (e) {
-  //     setState(() {
-  //       _errorMessage = 'error: $e';
-  //       _isLoading = false;
-  //     });
-  //   }
+  //     outfitReason =
+  //         reason +
+  //         "\n\nRecommended: " +
+  //         matchedItems
+  //             .map(
+  //               (item) =>
+  //                   "${item["baseColor"] ?? ''} ${item["articleType"] ?? ''}",
+  //             )
+  //             .join(", ");
+
+  //     isGenerated = true;
+  //     _isLoading = false;
+  //   });
   // }
+
+  // ⭐️⭐️⭐️️AIサーバー接続版⭐️⭐️⭐️
+  Future<void> _getOutfitRecommendation() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+      isGenerated = false;
+    });
+
+    // OpenMeteoで取得済みのUI値を利用
+    double sendTemp = (_topCurrent ?? 22).toDouble();
+    String sendCond = _conditionFromWeatherCode(_topCode);
+
+    List<Map<String, dynamic>> closet = [];
+    String event = "No schedule";
+    String gender = "Unisex";
+
+    try {
+      closet = await _fetchCloset();
+      event = await _fetchTodayEvent();
+      gender = await _fetchUserGender();
+    } catch (e) {
+      debugPrint("fetch data failed: $e");
+    }
+
+    final requestData = {
+      "closet": closet,
+      "event": event,
+      "temperature": sendTemp,
+      "condition": sendCond,
+      "gender": gender,
+    };
+    debugPrint("sending payload: $requestData");
+
+    try {
+      final res = await http
+          .post(
+            Uri.parse(_apiUrl), // ★ ngrok/서버 주소
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestData),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (res.statusCode == 200) {
+        final body = json.decode(utf8.decode(res.bodyBytes));
+        debugPrint("server response: $body");
+
+        // ★ サーバーが {"ids":[..],"reason":"..."} を返す想定
+        final List<dynamic> idsDyn = body['ids'] ?? [];
+        final String reason = body['reason'] ?? "No reason provided";
+
+        // closet から該当 id の服を探す
+        final matchedItems = closet.where((item) {
+          return idsDyn.contains(item["id"]);
+        }).toList();
+
+        setState(() {
+          outfitImages = matchedItems
+              .map((item) => item["image"] as String)
+              .toList();
+          outfitReason =
+              reason +
+              "\n\nRecommended: " +
+              matchedItems
+                  .map((item) => "${item["baseColor"]} ${item["articleType"]}")
+                  .join(", ");
+          isGenerated = true;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'server error: ${res.statusCode}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'error: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   // ---------------- weathercode → 아이콘 ----------------
   IconData _iconFromWeatherCode(int? code) {

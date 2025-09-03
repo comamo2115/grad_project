@@ -29,7 +29,7 @@ class Command(BaseCommand):
 
 
         # CSV 読み込み & Clothes 登録
-        with open("new_scenarios.csv", newline="", encoding="utf-8") as csvfile:
+        with open("test01.csv", newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 clothes = Clothes(

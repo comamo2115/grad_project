@@ -25,7 +25,7 @@ User = get_user_model()
 class Clothes(models.Model):
     id = models.AutoField(primary_key=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="clothes")  # 사용자와 연결
-    image = models.ImageField(upload_to="clothes/")
+    image = models.ImageField(upload_to="clothes/", blank=True, null=True)
     gender = models.CharField(max_length=10)
     masterCategory = models.CharField(max_length=50)
     subCategory = models.CharField(max_length=50)
