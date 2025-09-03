@@ -372,9 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final body = json.decode(utf8.decode(res.bodyBytes));
         debugPrint("server response: $body");
 
-        // ★ サーバーが {"ids":[..],"reason":"..."} を返す想定
-        final List<dynamic> idsDyn = body['ids'] ?? [];
-        final String reason = body['reason'] ?? "No reason provided";
+        // ★ サーバーのレスポンス形式に対応
+        final List<dynamic> idsDyn = body['best_combination']?['ids'] ?? [];
+        final String explanation = body['explanation'] ?? "No explanation";
 
         // closet から該当 id の服を探す
         final matchedItems = closet.where((item) {
@@ -383,14 +383,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
         setState(() {
           outfitImages = matchedItems
-              .map((item) => item["image"] as String)
+              .map((item) => item["image"] as String? ?? "")
               .toList();
-          outfitReason =
-              reason +
-              "\n\nRecommended: " +
-              matchedItems
-                  .map((item) => "${item["baseColor"]} ${item["articleType"]}")
-                  .join(", ");
+
+          // ★ 説明文をそのまま表示
+          outfitReason = explanation;
+
           isGenerated = true;
           _isLoading = false;
         });
