@@ -1,4 +1,4 @@
-custom id,gender,masterCategory,subCategory,articleType,baseColour,season,year,usage,productDisplayName,Image
+custom id,gender,masterCategory,subCategory,articleType,baseColour,season,year,usage,productDisplayName,image
 ,Men,Apparel,Topwear,Shirts,White,Fall,2011,Casual,,white_shirt.jpg
 ,Men,Apparel,Topwear,Tshirts,Black,Fall,2011,Casual,,black_tshirt.jpg
 ,Men,Apparel,Topwear,Tshirts,Blue,Fall,2011,Casual,,blue_tshirt.jpg

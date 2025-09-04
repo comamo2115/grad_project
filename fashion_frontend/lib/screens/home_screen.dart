@@ -53,8 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> outfitImages = [];
   String outfitReason = 'This is an outfit suitable for a meeting.';
 
+  List<Map<String, String>> outfitResults = [];
+
   static const String _apiUrl =
-      'https://58fea4bf219d.ngrok-free.app/recommend_outfit';
+      'https://b1fdeab1d5f5.ngrok-free.app/recommend_outfit';
 
   String _topCity = 'Locating...';
   int? _topCurrent;
@@ -212,7 +214,6 @@ class _HomeScreenState extends State<HomeScreen> {
         if (map.containsKey('custom_id')) {
           map['id'] = map['custom_id'];
           map.remove('custom_id'); // もし不要なら消す
-          map.remove('image');
           map.remove('owner');
         }
         return map;
@@ -372,23 +373,34 @@ class _HomeScreenState extends State<HomeScreen> {
         final body = json.decode(utf8.decode(res.bodyBytes));
         debugPrint("server response: $body");
 
-        // ★ サーバーのレスポンス形式に対応
-        final List<dynamic> idsDyn = body['best_combination']?['ids'] ?? [];
+        final bestCombo = body['best_combination'] ?? {};
+        final List<dynamic> idsDyn = bestCombo['ids'] ?? [];
+        final List<String> descList =
+            (bestCombo['description'] as String?)
+                ?.split(',')
+                .map((s) => s.trim())
+                .toList() ??
+            [];
         final String explanation = body['explanation'] ?? "No explanation";
 
-        // closet から該当 id の服を探す
-        final matchedItems = closet.where((item) {
-          return idsDyn.contains(item["id"]);
-        }).toList();
+        // ids に基づき closet から探す or 空にする
+        final results = <Map<String, String>>[];
+        for (int i = 0; i < idsDyn.length; i++) {
+          final id = idsDyn[i];
+          final desc = i < descList.length ? descList[i] : "";
+
+          final matched = closet.firstWhere(
+            (item) => item["id"] == id,
+            orElse: () => <String, dynamic>{},
+          );
+          final img = matched["image"] as String? ?? "";
+
+          results.add({"image": img, "desc": desc});
+        }
 
         setState(() {
-          outfitImages = matchedItems
-              .map((item) => item["image"] as String? ?? "")
-              .toList();
-
-          // ★ 説明文をそのまま表示
+          outfitResults = results; // ★ ここで保持
           outfitReason = explanation;
-
           isGenerated = true;
           _isLoading = false;
         });
@@ -601,27 +613,75 @@ class _HomeScreenState extends State<HomeScreen> {
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
-                    children: outfitImages
-                        .map(
-                          (img) => Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xffe3e3e3),
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              image: DecorationImage(
-                                image: img.startsWith('http')
-                                    ? NetworkImage(img)
-                                    : AssetImage(img) as ImageProvider,
-                                fit: BoxFit.cover,
+                    children: outfitResults.map((item) {
+                      final imgPath = item["image"] ?? "";
+                      final desc = item["desc"] ?? "";
+                      final baseUrl = "http://127.0.0.1:8000";
+                      final fullUrl = imgPath.startsWith("http")
+                          ? imgPath
+                          : "$baseUrl$imgPath";
+
+                      return Container(
+                        width: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xffe3e3e3)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              fit: FlexFit.loose,
+                              child: imgPath.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(10),
+                                        topRight: Radius.circular(10),
+                                      ),
+                                      child: Image.network(
+                                        fullUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const ColoredBox(
+                                              color: Color(0xFFEFEFEF),
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.image_not_supported,
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    )
+                                  : const SizedBox(
+                                      height: 145, // 他の画像と同じ高さ
+                                      child: ColoredBox(
+                                        color: Color(0xFFEFEFEF),
+                                        child: Center(
+                                          child: Icon(Icons.checkroom),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Text(
+                                desc,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'Futura',
+                                  color: Color(0xff0D0D0D),
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                        .toList(),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
+
                   const SizedBox(height: 24),
                   Text(
                     outfitReason,
