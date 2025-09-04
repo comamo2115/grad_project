@@ -142,13 +142,13 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     if (!_formValid) return;
 
     final storage = const FlutterSecureStorage();
-    final token = await storage.read(key: 'access_token');
+    String? access = await storage.read(key: 'access_token');
+    final refresh = await storage.read(key: 'refresh_token');
 
-    // 날짜 문자열 (YYYY-MM-DD)
+    // 날짜 문자열
     final dateStr =
         '${_selectedDate!.year}-${_selectedDate!.month.toString().padLeft(2, '0')}-${_selectedDate!.day.toString().padLeft(2, '0')}';
 
-    // 시간 문자열 (HH:MM) → null 허용
     String? startTimeStr;
     String? endTimeStr;
     if (!_allDay) {
@@ -172,17 +172,41 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     };
 
     try {
-      final resp = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/events/'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode(body),
-      );
+      // --- 共通で使う関数化 ---
+      Future<http.Response> doPost(String? token) {
+        return http.post(
+          Uri.parse('http://127.0.0.1:8000/api/events/'),
+          headers: {
+            'Content-Type': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(body),
+        );
+      }
+
+      var resp = await doPost(access);
+
+      // 401 → refresh 처리
+      if (resp.statusCode == 401 && refresh != null) {
+        final refreshResp = await http.post(
+          Uri.parse('http://127.0.0.1:8000/api/auth/refresh/'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({"refresh": refresh}),
+        );
+
+        if (refreshResp.statusCode == 200) {
+          final data = jsonDecode(refreshResp.body);
+          final newAccess = data["access"];
+          if (newAccess != null) {
+            await storage.write(key: "access_token", value: newAccess);
+            access = newAccess;
+            resp = await doPost(newAccess); // 👉 再リクエスト
+          }
+        }
+      }
 
       if (resp.statusCode == 201) {
-        Navigator.pop(context, true); // 성공 시 이전 화면으로 돌아가고 true 반환
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(
           context,

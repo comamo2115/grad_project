@@ -64,10 +64,20 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _topLow;
   int? _topCode;
 
+  String _todayEvent = 'Loading...';
+
   @override
   void initState() {
     super.initState();
     _loadHomeTopWeather();
+    _loadTodayEvent();
+  }
+
+  Future<void> _loadTodayEvent() async {
+    final event = await _fetchTodayEvent();
+    setState(() {
+      _todayEvent = event;
+    });
   }
 
   // ---------------- 위치 ----------------
@@ -258,75 +268,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return "Unisex";
   }
 
-  // // 　⭐️MOCK⭐️
-  // Future<void> _getOutfitRecommendation() async {
-  //   setState(() {
-  //     _isLoading = true;
-  //     _errorMessage = '';
-  //     isGenerated = false;
-  //   });
-
-  //   // OpenMeteo で取得済みの値を利用
-  //   double sendTemp = (_topCurrent ?? 22).toDouble();
-  //   String sendCond = _conditionFromWeatherCode(_topCode);
-
-  //   List<Map<String, dynamic>> closet = [];
-  //   String event = "No schedule";
-  //   String gender = "Unisex";
-
-  //   try {
-  //     closet = await _fetchCloset();
-  //     event = await _fetchTodayEvent();
-  //     gender = await _fetchUserGender();
-  //   } catch (e) {
-  //     debugPrint("fetch data failed: $e");
-  //   }
-
-  //   final requestData = {
-  //     "closet": closet,
-  //     "event": event,
-  //     "temperature": sendTemp,
-  //     "condition": sendCond,
-  //     "gender": gender,
-  //   };
-  //   debugPrint("MOCK sending payload: $requestData");
-
-  //   // ★ 疑似レスポンス
-  //   final Map<String, dynamic> mockResponse = {
-  //     "ids": [925167, 350874],
-  //     "reason": "Rainy day → darker Tshirts recommended!",
-  //   };
-
-  //   final List<dynamic> idsDyn = (mockResponse["ids"] as List?) ?? [];
-  //   final String reason =
-  //       mockResponse["reason"] as String? ?? "No reason provided";
-
-  //   // closet から該当 id の服を探す
-  //   final matchedItems = closet.where((item) {
-  //     final id = item["id"];
-  //     return id != null && idsDyn.contains(id);
-  //   }).toList();
-
-  //   setState(() {
-  //     outfitImages = matchedItems
-  //         .map((item) => item["image"] as String? ?? "")
-  //         .toList();
-
-  //     outfitReason =
-  //         reason +
-  //         "\n\nRecommended: " +
-  //         matchedItems
-  //             .map(
-  //               (item) =>
-  //                   "${item["baseColor"] ?? ''} ${item["articleType"] ?? ''}",
-  //             )
-  //             .join(", ");
-
-  //     isGenerated = true;
-  //     _isLoading = false;
-  //   });
-  // }
-
   // ⭐️⭐️⭐️️AIサーバー接続版⭐️⭐️⭐️
   Future<void> _getOutfitRecommendation() async {
     setState(() {
@@ -467,7 +408,12 @@ class _HomeScreenState extends State<HomeScreen> {
             right: 12,
             height: 41,
             child: GestureDetector(
-              onTap: () {}, // /weather 화면 이동 처리 가능
+              onTap: () {
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).pushNamed('/weather');
+              }, // /weather 화면 이동 처리 가능
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xfff9f2ed),
@@ -553,15 +499,12 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             top: 135 + yOffset,
             left: MediaQuery.of(context).size.width / 2 - 133,
-            child: const IgnorePointer(
-              ignoring: true,
-              child: Text(
-                "Today’s plan : ...",
-                style: TextStyle(
-                  fontFamily: 'Futura',
-                  fontSize: 16,
-                  color: Color(0xfff9f2ed),
-                ),
+            child: Text(
+              "Today’s plan : $_todayEvent",
+              style: const TextStyle(
+                fontFamily: 'Futura',
+                fontSize: 16,
+                color: Color(0xfff9f2ed),
               ),
             ),
           ),
