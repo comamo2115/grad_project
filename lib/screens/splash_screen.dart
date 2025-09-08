@@ -46,9 +46,7 @@ class _SplashScreenState extends State<SplashScreen> {
         refresh != null &&
         refresh.isNotEmpty) {
       // --------- リフレッシュ試行 ---------
-      final refreshUrl = Uri.parse(
-        "http://127.0.0.1:8000/api/auth/token/refresh/",
-      );
+      final refreshUrl = Uri.parse("http://127.0.0.1:8000/api/auth/refresh/");
       final refreshResp = await http.post(
         refreshUrl,
         headers: {"Content-Type": "application/json"},

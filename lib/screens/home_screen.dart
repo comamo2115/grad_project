@@ -53,6 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> outfitImages = [];
   String outfitReason = 'This is an outfit suitable for a meeting.';
 
+  List<Map<String, String>> outfitResults = [];
+
   static const String _apiUrl =
       'https://11119ada0da0.ngrok-free.app/recommend_outfit';
 

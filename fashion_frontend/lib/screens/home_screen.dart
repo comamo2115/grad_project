@@ -53,8 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> outfitImages = [];
   String outfitReason = 'This is an outfit suitable for a meeting.';
 
+  List<Map<String, String>> outfitResults = [];
+
   static const String _apiUrl =
-      'https://11119ada0da0.ngrok-free.app/recommend_outfit';
+      'https://b1fdeab1d5f5.ngrok-free.app/recommend_outfit';
 
   String _topCity = 'Locating...';
   int? _topCurrent;
@@ -62,10 +64,20 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _topLow;
   int? _topCode;
 
+  String _todayEvent = 'Loading...';
+
   @override
   void initState() {
     super.initState();
     _loadHomeTopWeather();
+    _loadTodayEvent();
+  }
+
+  Future<void> _loadTodayEvent() async {
+    final event = await _fetchTodayEvent();
+    setState(() {
+      _todayEvent = event;
+    });
   }
 
   // ---------------- 위치 ----------------
@@ -212,7 +224,6 @@ class _HomeScreenState extends State<HomeScreen> {
         if (map.containsKey('custom_id')) {
           map['id'] = map['custom_id'];
           map.remove('custom_id'); // もし不要なら消す
-          map.remove('image');
           map.remove('owner');
         }
         return map;
@@ -257,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return "Unisex";
   }
 
-  // 　⭐️MOCK⭐️
+  // ⭐️⭐️⭐️️AIサーバー接続版⭐️⭐️⭐️
   Future<void> _getOutfitRecommendation() async {
     setState(() {
       _isLoading = true;
@@ -265,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
       isGenerated = false;
     });
 
-    // OpenMeteo で取得済みの値を利用
+    // OpenMeteoで取得済みのUI値を利用
     double sendTemp = (_topCurrent ?? 22).toDouble();
     String sendCond = _conditionFromWeatherCode(_topCode);
 
@@ -288,124 +299,65 @@ class _HomeScreenState extends State<HomeScreen> {
       "condition": sendCond,
       "gender": gender,
     };
-    debugPrint("MOCK sending payload: $requestData");
+    debugPrint("sending payload: $requestData");
 
-    // ★ 疑似レスポンス
-    final Map<String, dynamic> mockResponse = {
-      "ids": [925167, 350874],
-      "reason": "Rainy day → darker Tshirts recommended!",
-    };
+    try {
+      final res = await http
+          .post(
+            Uri.parse(_apiUrl), // ★ ngrok/서버 주소
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode(requestData),
+          )
+          .timeout(const Duration(seconds: 15));
 
-    final List<dynamic> idsDyn = (mockResponse["ids"] as List?) ?? [];
-    final String reason =
-        mockResponse["reason"] as String? ?? "No reason provided";
+      if (res.statusCode == 200) {
+        final body = json.decode(utf8.decode(res.bodyBytes));
+        debugPrint("server response: $body");
 
-    // closet から該当 id の服を探す
-    final matchedItems = closet.where((item) {
-      final id = item["id"];
-      return id != null && idsDyn.contains(id);
-    }).toList();
+        final bestCombo = body['best_combination'] ?? {};
+        final List<dynamic> idsDyn = bestCombo['ids'] ?? [];
+        final List<String> descList =
+            (bestCombo['description'] as String?)
+                ?.split(',')
+                .map((s) => s.trim())
+                .toList() ??
+            [];
+        final String explanation = body['explanation'] ?? "No explanation";
 
-    setState(() {
-      outfitImages = matchedItems
-          .map((item) => item["image"] as String? ?? "")
-          .toList();
+        // ids に基づき closet から探す or 空にする
+        final results = <Map<String, String>>[];
+        for (int i = 0; i < idsDyn.length; i++) {
+          final id = idsDyn[i];
+          final desc = i < descList.length ? descList[i] : "";
 
-      outfitReason =
-          reason +
-          "\n\nRecommended: " +
-          matchedItems
-              .map(
-                (item) =>
-                    "${item["baseColor"] ?? ''} ${item["articleType"] ?? ''}",
-              )
-              .join(", ");
+          final matched = closet.firstWhere(
+            (item) => item["id"] == id,
+            orElse: () => <String, dynamic>{},
+          );
+          final img = matched["image"] as String? ?? "";
 
-      isGenerated = true;
-      _isLoading = false;
-    });
+          results.add({"image": img, "desc": desc});
+        }
+
+        setState(() {
+          outfitResults = results; // ★ ここで保持
+          outfitReason = explanation;
+          isGenerated = true;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'server error: ${res.statusCode}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'error: $e';
+        _isLoading = false;
+      });
+    }
   }
-
-  // ⭐️⭐️⭐️️AIサーバー接続版⭐️⭐️⭐️
-  // Future<void> _getOutfitRecommendation() async {
-  //   setState(() {
-  //     _isLoading = true;
-  //     _errorMessage = '';
-  //     isGenerated = false;
-  //   });
-
-  //   // OpenMeteoで取得済みのUI値を利用
-  //   double sendTemp = (_topCurrent ?? 22).toDouble();
-  //   String sendCond = _conditionFromWeatherCode(_topCode);
-
-  //   List<Map<String, dynamic>> closet = [];
-  //   String event = "No schedule";
-  //   String gender = "Unisex";
-
-  //   try {
-  //     closet = await _fetchCloset();
-  //     event = await _fetchTodayEvent();
-  //     gender = await _fetchUserGender();
-  //   } catch (e) {
-  //     debugPrint("fetch data failed: $e");
-  //   }
-
-  //   final requestData = {
-  //     "closet": closet,
-  //     "event": event,
-  //     "temperature": sendTemp,
-  //     "condition": sendCond,
-  //     "gender": gender,
-  //   };
-  //   debugPrint("sending payload: $requestData");
-
-  //   try {
-  //     final res = await http
-  //         .post(
-  //           Uri.parse(_apiUrl), // ★ ngrok/서버 주소
-  //           headers: {'Content-Type': 'application/json'},
-  //           body: json.encode(requestData),
-  //         )
-  //         .timeout(const Duration(seconds: 15));
-
-  //     if (res.statusCode == 200) {
-  //       final body = json.decode(utf8.decode(res.bodyBytes));
-
-  //       // ★ サーバーが {"ids":[..],"reason":"..."} を返す想定
-  //       final List<dynamic> idsDyn = body['ids'] ?? [];
-  //       final String reason = body['reason'] ?? "No reason provided";
-
-  //       // closet から該当 id の服を探す
-  //       final matchedItems = closet.where((item) {
-  //         return idsDyn.contains(item["id"]);
-  //       }).toList();
-
-  //       setState(() {
-  //         outfitImages = matchedItems
-  //             .map((item) => item["image"] as String)
-  //             .toList();
-  //         outfitReason =
-  //             reason +
-  //             "\n\nRecommended: " +
-  //             matchedItems
-  //                 .map((item) => "${item["baseColor"]} ${item["articleType"]}")
-  //                 .join(", ");
-  //         isGenerated = true;
-  //         _isLoading = false;
-  //       });
-  //     } else {
-  //       setState(() {
-  //         _errorMessage = 'server error: ${res.statusCode}';
-  //         _isLoading = false;
-  //       });
-  //     }
-  //   } catch (e) {
-  //     setState(() {
-  //       _errorMessage = 'error: $e';
-  //       _isLoading = false;
-  //     });
-  //   }
-  // }
 
   // ---------------- weathercode → 아이콘 ----------------
   IconData _iconFromWeatherCode(int? code) {
@@ -456,7 +408,12 @@ class _HomeScreenState extends State<HomeScreen> {
             right: 12,
             height: 41,
             child: GestureDetector(
-              onTap: () {}, // /weather 화면 이동 처리 가능
+              onTap: () {
+                Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).pushNamed('/weather');
+              }, // /weather 화면 이동 처리 가능
               child: Container(
                 decoration: BoxDecoration(
                   color: const Color(0xfff9f2ed),
@@ -542,15 +499,12 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             top: 135 + yOffset,
             left: MediaQuery.of(context).size.width / 2 - 133,
-            child: const IgnorePointer(
-              ignoring: true,
-              child: Text(
-                "Today’s plan : ...",
-                style: TextStyle(
-                  fontFamily: 'Futura',
-                  fontSize: 16,
-                  color: Color(0xfff9f2ed),
-                ),
+            child: Text(
+              "Today’s plan : $_todayEvent",
+              style: const TextStyle(
+                fontFamily: 'Futura',
+                fontSize: 16,
+                color: Color(0xfff9f2ed),
               ),
             ),
           ),
@@ -602,27 +556,75 @@ class _HomeScreenState extends State<HomeScreen> {
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
-                    children: outfitImages
-                        .map(
-                          (img) => Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: const Color(0xffe3e3e3),
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                              image: DecorationImage(
-                                image: img.startsWith('http')
-                                    ? NetworkImage(img)
-                                    : AssetImage(img) as ImageProvider,
-                                fit: BoxFit.cover,
+                    children: outfitResults.map((item) {
+                      final imgPath = item["image"] ?? "";
+                      final desc = item["desc"] ?? "";
+                      final baseUrl = "http://127.0.0.1:8000";
+                      final fullUrl = imgPath.startsWith("http")
+                          ? imgPath
+                          : "$baseUrl$imgPath";
+
+                      return Container(
+                        width: 120,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xffe3e3e3)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              fit: FlexFit.loose,
+                              child: imgPath.isNotEmpty
+                                  ? ClipRRect(
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(10),
+                                        topRight: Radius.circular(10),
+                                      ),
+                                      child: Image.network(
+                                        fullUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            const ColoredBox(
+                                              color: Color(0xFFEFEFEF),
+                                              child: Center(
+                                                child: Icon(
+                                                  Icons.image_not_supported,
+                                                ),
+                                              ),
+                                            ),
+                                      ),
+                                    )
+                                  : const SizedBox(
+                                      height: 145, // 他の画像と同じ高さ
+                                      child: ColoredBox(
+                                        color: Color(0xFFEFEFEF),
+                                        child: Center(
+                                          child: Icon(Icons.checkroom),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(4.0),
+                              child: Text(
+                                desc,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'Futura',
+                                  color: Color(0xff0D0D0D),
+                                ),
                               ),
                             ),
-                          ),
-                        )
-                        .toList(),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
+
                   const SizedBox(height: 24),
                   Text(
                     outfitReason,

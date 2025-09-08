@@ -15,6 +15,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final storage = const FlutterSecureStorage();
   Map<String, dynamic>? _user;
   bool _loading = true;
+  String? _selectedGender;
+  int _clothesCount = 0;
 
   @override
   void initState() {
@@ -37,15 +39,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         setState(() {
-          _user = jsonDecode(response.body);
+          _user = data;
+          _selectedGender = data['gender'];
           _loading = false;
         });
+
+        // ★ 服の数を取得
+        _fetchClothesCount();
       } else {
         setState(() => _loading = false);
       }
     } catch (_) {
       setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _fetchClothesCount() async {
+    final token = await storage.read(key: "access_token");
+    if (token == null) return;
+
+    final url = Uri.parse("http://127.0.0.1:8000/api/clothes/");
+    final resp = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    if (resp.statusCode == 200) {
+      final List items = jsonDecode(resp.body);
+      setState(() {
+        _clothesCount = items.length;
+      });
+    }
+  }
+
+  Future<void> _updateGender(String newGender) async {
+    final token = await storage.read(key: "access_token");
+    if (token == null) return;
+
+    final url = Uri.parse("http://127.0.0.1:8000/api/auth/me/");
+    final resp = await http.patch(
+      url,
+      headers: {
+        "Authorization": "Bearer $token",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({"gender": newGender}),
+    );
+
+    if (resp.statusCode == 200) {
+      setState(() {
+        _selectedGender = newGender;
+        _user!['gender'] = newGender;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Failed to update gender (${resp.statusCode})")),
+      );
     }
   }
 
@@ -55,7 +106,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!mounted) return;
 
-    // ★ ルート全体を破棄して /login だけに戻す
     Navigator.of(
       context,
       rootNavigator: true,
@@ -65,6 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xfffbfbfb),
       appBar: AppBar(
         title: const Text("Profile"),
         backgroundColor: const Color(0xFFBFB69B),
@@ -74,36 +125,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
           : Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (_user != null) ...[
-                    Text(
-                      "ID: ${_user!['id']}",
-                      style: const TextStyle(fontSize: 18),
+                  // ---------- ユーザー情報カード ----------
+                  Card(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Username: ${_user!['username']}",
-                      style: const TextStyle(fontSize: 18),
+                    elevation: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ユーザー名
+                          Text(
+                            "ID (${_user?['username'] ?? '-'})",
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xff333333),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+
+                          // Gender 選択
+                          Row(
+                            children: [
+                              const Text(
+                                "Gender:",
+                                style: TextStyle(fontSize: 16),
+                              ),
+                              const SizedBox(width: 12),
+                              DropdownButton<String>(
+                                value: _selectedGender,
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: "Men",
+                                    child: Text("Men"),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: "Women",
+                                    child: Text("Women"),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  if (v != null) _updateGender(v);
+                                },
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // クローゼット数
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.checkroom,
+                                color: Color(0xFFBF634E),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                "You have $_clothesCount items in your closet.",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Color(0xff555555),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      "Gender: ${_user!['gender']}",
-                      style: const TextStyle(fontSize: 18),
-                    ),
-                  ] else ...[
-                    const Center(child: Text("로그인 정보 없음")),
-                  ],
+                  ),
+
                   const Spacer(),
-                  Center(
+
+                  // ---------- ログアウトボタン ----------
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _logout, // 👈 どんな状態でもログアウト可能
+                      onPressed: _logout,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFBF634E),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text(
                         "Logout",
-                        style: TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),

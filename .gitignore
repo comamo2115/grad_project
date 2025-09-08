@@ -2,3 +2,24 @@
 __pycache__/
 venv/
 *.zip
+
+# macOS
+.DS_Store
+
+# Python
+venv/
+myenv/
+__pycache__/
+
+# Django
+*.sqlite3
+media/
+
+# Flutter / Dart
+.dart_tool/
+.buildlog/
+.build/
+build/
+ios/Pods/
+.DS_Store
+.DS_Store

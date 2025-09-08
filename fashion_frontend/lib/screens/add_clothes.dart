@@ -3,7 +3,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart'; // ★ 카메라/갤러리 픽커
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
@@ -17,11 +16,6 @@ class AddClothesScreen extends StatefulWidget {
 }
 
 class _AddClothesScreenState extends State<AddClothesScreen> {
-  // ---------------- 날짜/숫자 상태 ----------------
-  DateTime? lastUsedDate;
-  DateTime? purchaseDate;
-  final TextEditingController timesUsedController = TextEditingController();
-
   // ---------------- 이미지 상태 ----------------
   // ★ 중앙 버튼으로 촬영/선택한 이미지 파일
   File? _imageFile;
@@ -327,9 +321,6 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
   // ---------------- 변경 여부(닫기 확인용) ----------------
   bool get _isDirty {
     return _imageFile != null ||
-        lastUsedDate != null ||
-        purchaseDate != null ||
-        (timesUsedController.text.trim().isNotEmpty) ||
         gender != null ||
         masterCategory != null ||
         subCategory != null ||
@@ -337,26 +328,6 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
         baseColor != null ||
         seasons.isNotEmpty ||
         usage != null;
-  }
-
-  // ---------------- 날짜 선택 ----------------
-  Future<void> _selectDate(BuildContext context, bool isLastUsed) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(2010),
-      lastDate: DateTime(2030),
-      helpText: isLastUsed ? 'Select last used date' : 'Select purchase date',
-    );
-    if (picked != null) {
-      setState(() {
-        if (isLastUsed) {
-          lastUsedDate = picked;
-        } else {
-          purchaseDate = picked;
-        }
-      });
-    }
   }
 
   // ---------------- 이미지 등록 (카메라 or 갤러리 선택) ----------------
@@ -405,6 +376,7 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
     );
   }
 
+  // ---------------- 저장 ----------------
   Future<void> _saveClothing() async {
     if (!_isValidRequired) return;
 
@@ -470,11 +442,11 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
         content: const Text('Do you want to close without saving?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false), // No → 닫지 않음
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('No'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true), // Yes → 닫기
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Yes'),
           ),
         ],
@@ -486,14 +458,7 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
   }
 
   @override
-  void dispose() {
-    timesUsedController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // ★ 전체를 세로 스크롤 가능하게: SingleChildScrollView 사용
     return WillPopScope(
       onWillPop: () async {
         if (!_isDirty) return true;
@@ -519,18 +484,10 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
                     right: 16,
                     bottom: 12,
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: const [
-                      // ★ 우상단 카메라 버튼 제거
-                      //  - 닫기(×)만 유지
-                      //  - 가운데 제목
-                      _AppBarCloseAndTitle(),
-                    ],
-                  ),
+                  child: const _AppBarCloseAndTitle(),
                 ),
 
-                // ---------------- 이미지 + 사진 버튼 + 날짜/횟수 카드 ----------------
+                // ---------------- 이미지 + 사진 버튼 ----------------
                 Container(
                   margin: const EdgeInsets.all(16),
                   padding: const EdgeInsets.all(16),
@@ -541,7 +498,6 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
                   ),
                   child: Column(
                     children: [
-                      // ★ 이미지 미리보기
                       AspectRatio(
                         aspectRatio: 1.6,
                         child: Container(
@@ -566,17 +522,13 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
                                 ),
                         ),
                       ),
-
                       const SizedBox(height: 12),
-
-                      // ★ 중앙(가운데) 사진 등록/변경 버튼 → LAST USED 위에 위치
                       Center(
                         child: SizedBox(
                           width: 200,
                           height: 42,
                           child: ElevatedButton.icon(
-                            onPressed: () =>
-                                _pickImage(context), // ★ 버튼 탭 시 촬영/등록
+                            onPressed: () => _pickImage(context),
                             icon: const Icon(Icons.camera_alt),
                             label: Text(
                               _imageFile == null ? 'Add Photo' : 'Change Photo',
@@ -591,26 +543,11 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
                           ),
                         ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // ★ LAST USED 이하
-                      _buildDateRow(
-                        'LAST USED',
-                        lastUsedDate,
-                        () => _selectDate(context, true),
-                      ),
-                      _buildTextFieldRow('TIMES USED', timesUsedController),
-                      _buildDateRow(
-                        'PURCHASE DATE',
-                        purchaseDate,
-                        () => _selectDate(context, false),
-                      ),
                     ],
                   ),
                 ),
 
-                // ---------------- 기본 정보 타이틀 ----------------
+                // ---------------- 기본 정보 ----------------
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
@@ -628,12 +565,8 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
                   ),
                 ),
 
-                // ---------------- 입력/선택 필드 ----------------
                 ListView(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 0,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
@@ -740,48 +673,9 @@ class _AddClothesScreenState extends State<AddClothesScreen> {
       ),
     );
   }
-
-  // ---------------- 날짜 행 ----------------
-  Widget _buildDateRow(String label, DateTime? date, VoidCallback onTap) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _Label(label),
-        TextButton(
-          onPressed: onTap,
-          child: Text(
-            date != null ? DateFormat('yyyy/MM/dd').format(date) : '—/—/—',
-            style: const TextStyle(color: Colors.black),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ---------------- 숫자 입력 행 ----------------
-  Widget _buildTextFieldRow(String label, TextEditingController controller) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _Label(label),
-        SizedBox(
-          width: 80,
-          child: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-// ---------------- AppBar 닫기+제목 (카메라 버튼 제거) ----------------
+// ---------------- AppBar 닫기+제목 ----------------
 class _AppBarCloseAndTitle extends StatelessWidget {
   const _AppBarCloseAndTitle();
 
@@ -791,12 +685,7 @@ class _AppBarCloseAndTitle extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         GestureDetector(
-          onTap: () async {
-            // ★ 상위 state의 _tryClose 호출을 직접 접근할 수 없으므로
-            //   Navigator.pop으로 단순 종료를 원하면 여기서 처리 가능.
-            //   현재는 디자인 상 AppBar에서의 확인 다이얼로그는 생략.
-            Navigator.maybePop(context);
-          },
+          onTap: () => Navigator.maybePop(context),
           child: const Icon(Icons.close, color: Colors.white),
         ),
         const Text(
@@ -807,7 +696,7 @@ class _AppBarCloseAndTitle extends StatelessWidget {
             fontSize: 16,
           ),
         ),
-        const SizedBox(width: 24), // 우측 여백(아이콘 자리 균형용)
+        const SizedBox(width: 24),
       ],
     );
   }
@@ -827,7 +716,7 @@ class _Label extends StatelessWidget {
   }
 }
 
-// ---------------- 드롭다운 행(일반 선택) ----------------
+// ---------------- 드롭다운 행 ----------------
 class _DropdownRow extends StatelessWidget {
   final String label;
   final String? value;
@@ -887,7 +776,7 @@ class _DropdownRow extends StatelessWidget {
   }
 }
 
-// ---------------- 검색 가능한 선택 행(Autocomplete) ----------------
+// ---------------- 검색 가능한 선택 행 ----------------
 class _SearchableRow extends StatelessWidget {
   final String label;
   final String? value;
@@ -927,7 +816,6 @@ class _SearchableRow extends StatelessWidget {
                   onSelected: (sel) => onChanged(sel),
                   fieldViewBuilder:
                       (context, textCtrl, focusNode, onFieldSubmitted) {
-                        // ★ 외부 value와 동기화
                         textCtrl.text = controller.text;
                         textCtrl.selection = TextSelection.fromPosition(
                           TextPosition(offset: textCtrl.text.length),

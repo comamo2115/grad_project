@@ -29,7 +29,7 @@ class Command(BaseCommand):
 
 
         # CSV 読み込み & Clothes 登録
-        with open("new_scenarios.csv", newline="", encoding="utf-8") as csvfile:
+        with open("test_scenarios/test01.csv", newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 clothes = Clothes(
@@ -46,11 +46,15 @@ class Command(BaseCommand):
                 # 画像があれば保存
                 image_name = row.get("image")
                 if image_name:
-                    # 例: CSV に "abc123.jpg" と書いてある場合
                     image_path = os.path.join(settings.MEDIA_ROOT, "clothes", image_name)
                     if os.path.exists(image_path):
                         with open(image_path, "rb") as f:
                             clothes.image.save(image_name, File(f), save=False)
+                        print(f"image saved: {image_name}")
+                    else:
+                        print(f"image not found: {image_path}")
+                else:
+                    print("image column is empty")
 
                 clothes.save()
 
