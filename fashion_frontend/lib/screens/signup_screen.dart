@@ -82,7 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
   // ID 길이/문자 유효성만 로컬에서 판단
   void _recomputeIdValidity(String value) {
     setState(() {
-      _isIdLenValid = value.length >= 5 && value.length <= 20;
+      _isIdLenValid = value.length >= 4 && value.length <= 20;
       _isIdCharValid = value.isEmpty ? false : _allowed.hasMatch(value);
     });
   }
@@ -277,7 +277,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text(
-                  'ID must be 5 to 20 characters (a-zA-Z0-9 _-!@.)',
+                  'ID must be 4 to 20 characters (a-zA-Z0-9 _-!@.)',
                   style: TextStyle(color: Colors.red),
                 ),
               ),
@@ -378,29 +378,28 @@ class _SignupScreenState extends State<SignupScreen> {
 
             const SizedBox(height: 20),
 
-            // or
-            const Center(child: Text('or', style: TextStyle(fontSize: 20))),
-            const SizedBox(height: 20),
+            // // or
+            // const Center(child: Text('or', style: TextStyle(fontSize: 20))),
+            // const SizedBox(height: 20),
 
             // Google 로그인 버튼
-            OutlinedButton.icon(
-              onPressed: () {
-                // 추후 구현 예정
-              },
-              icon: const Icon(Icons.g_mobiledata, size: 24),
-              label: const Text(
-                'Sign up with Google',
-                style: TextStyle(fontSize: 18),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xff8e908e)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(40),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-            ),
-
+            // OutlinedButton.icon(
+            //   onPressed: () {
+            //     // 추후 구현 예정
+            //   },
+            //   icon: const Icon(Icons.g_mobiledata, size: 24),
+            //   label: const Text(
+            //     'Sign up with Google',
+            //     style: TextStyle(fontSize: 18),
+            //   ),
+            //   style: OutlinedButton.styleFrom(
+            //     side: const BorderSide(color: Color(0xff8e908e)),
+            //     shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(40),
+            //     ),
+            //     padding: const EdgeInsets.symmetric(vertical: 15),
+            //   ),
+            // ),
             const SizedBox(height: 30),
 
             // Already have an account? → Login

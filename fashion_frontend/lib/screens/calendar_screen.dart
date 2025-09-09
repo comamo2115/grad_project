@@ -123,7 +123,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
           _currentMonth.month == _today.month) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           final idx = _today.day - 1;
-          final offset = (idx * _rowHeight) - 8;
+          final offset = (idx * _rowHeight);
           if (_scrollController.hasClients) {
             _scrollController.jumpTo(
               offset.clamp(0.0, _scrollController.position.maxScrollExtent),
@@ -258,7 +258,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       MaterialPageRoute(
                         builder: (context) => const AddScheduleScreen(),
                       ),
-                    );
+                    ).then((result) {
+                      if (result == true) {
+                        _fetchMonth();
+                        _fetchToday();
+                      }
+                    });
                   },
                   child: const Row(
                     children: [
