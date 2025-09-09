@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, String>> outfitResults = [];
 
   static const String _apiUrl =
-      'https://b1fdeab1d5f5.ngrok-free.app/recommend_outfit';
+      'https://49c5e891fd4b.ngrok-free.app/recommend_outfit';
 
   String _topCity = 'Locating...';
   int? _topCurrent;
@@ -64,12 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _topLow;
   int? _topCode;
 
+  String _username = '';
+
   String _todayEvent = 'Loading...';
 
   @override
   void initState() {
     super.initState();
     _loadHomeTopWeather();
+    _fetchUserName();
     _loadTodayEvent();
   }
 
@@ -234,6 +237,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _fetchUserName() async {
+    final token = await storage.read(key: "access_token");
+    if (token == null) return;
+
+    final url = Uri.parse("http://127.0.0.1:8000/api/auth/me/");
+    final res = await http.get(
+      url,
+      headers: {"Authorization": "Bearer $token"},
+    );
+
+    if (res.statusCode == 200) {
+      final data = jsonDecode(res.body);
+      setState(() {
+        _username = data['username'] ?? '';
+      });
+    }
+  }
+
   Future<String> _fetchTodayEvent() async {
     final token = await storage.read(key: "access_token");
     if (token == null) return "No schedule";
@@ -276,10 +297,28 @@ class _HomeScreenState extends State<HomeScreen> {
       isGenerated = false;
     });
 
-    // OpenMeteoで取得済みのUI値を利用
-    double sendTemp = (_topCurrent ?? 22).toDouble();
-    String sendCond = _conditionFromWeatherCode(_topCode);
+    // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️ MOCK ここから ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
+    bool useMockWeather = true;
+    double mockTemperature = 15.0;
+    String mockCondition = "Clear";
 
+    // 실제 전송값 정의
+    double sendTemp = useMockWeather
+        ? mockTemperature
+        : (_topCurrent ?? 22).toDouble();
+
+    String sendCond = useMockWeather
+        ? mockCondition
+        : _conditionFromWeatherCode(_topCode);
+
+    // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️ MOCK ここまで温度設定⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
+
+    // ---------------- Open-Meteo에서 화면에 표시된 현재 기온/날씨코드를 그대로 사용 ----------------
+    // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️ した二つを注釈消したら現在気温送れる⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
+    // double sendTemp = (_topCurrent ?? 22).toDouble();
+    // String sendCond = _conditionFromWeatherCode(_topCode);
+
+    // ---------------- Closet, Event, Gender ----------------
     List<Map<String, dynamic>> closet = [];
     String event = "No schedule";
     String gender = "Unisex";
@@ -292,6 +331,15 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint("fetch data failed: $e");
     }
 
+    // ---------------- 전송 직전 로그 ----------------
+    final closetIds = closet.map((c) => c["id"]).toList();
+    print("=== Sending Data ===");
+    print("Event: $event");
+    print("Temperature: $sendTemp");
+    print("Condition: $sendCond");
+    print("Gender: $gender");
+    print("Closet IDs: $closetIds");
+
     final requestData = {
       "closet": closet,
       "event": event,
@@ -299,12 +347,11 @@ class _HomeScreenState extends State<HomeScreen> {
       "condition": sendCond,
       "gender": gender,
     };
-    debugPrint("sending payload: $requestData");
 
     try {
       final res = await http
           .post(
-            Uri.parse(_apiUrl), // ★ ngrok/서버 주소
+            Uri.parse(_apiUrl),
             headers: {'Content-Type': 'application/json'},
             body: json.encode(requestData),
           )
@@ -312,7 +359,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (res.statusCode == 200) {
         final body = json.decode(utf8.decode(res.bodyBytes));
-        debugPrint("server response: $body");
+
+        // ---------------- 응답 출력 ----------------
+        print("=== API Response ===");
+        print(json.encode(body));
 
         final bestCombo = body['best_combination'] ?? {};
         final List<dynamic> idsDyn = bestCombo['ids'] ?? [];
@@ -324,23 +374,20 @@ class _HomeScreenState extends State<HomeScreen> {
             [];
         final String explanation = body['explanation'] ?? "No explanation";
 
-        // ids に基づき closet から探す or 空にする
         final results = <Map<String, String>>[];
         for (int i = 0; i < idsDyn.length; i++) {
           final id = idsDyn[i];
           final desc = i < descList.length ? descList[i] : "";
-
           final matched = closet.firstWhere(
             (item) => item["id"] == id,
             orElse: () => <String, dynamic>{},
           );
           final img = matched["image"] as String? ?? "";
-
           results.add({"image": img, "desc": desc});
         }
 
         setState(() {
-          outfitResults = results; // ★ ここで保持
+          outfitResults = results;
           outfitReason = explanation;
           isGenerated = true;
           _isLoading = false;
@@ -385,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen> {
             top: 0,
             left: 0,
             right: 0,
-            height: 167 + yOffset,
+            height: 200 + yOffset,
             child: Container(color: const Color(0xffbfb69b)),
           ),
           Positioned(
@@ -498,7 +545,23 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Positioned(
             top: 135 + yOffset,
-            left: MediaQuery.of(context).size.width / 2 - 133,
+            left: MediaQuery.of(context).size.width / 2 - 150,
+            child: IgnorePointer(
+              ignoring: true,
+              child: Text(
+                _username.isNotEmpty ? "Hello, $_username!" : "Hello!",
+                style: const TextStyle(
+                  fontFamily: 'Futura',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xfff9f2ed),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 165 + yOffset,
+            left: MediaQuery.of(context).size.width / 2 - 150,
             child: Text(
               "Today’s plan : $_todayEvent",
               style: const TextStyle(
@@ -509,7 +572,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Positioned(
-            top: 180 + yOffset,
+            top: 210 + yOffset,
             left: 0,
             right: 0,
             child: GestureDetector(
@@ -548,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           if (isGenerated)
             Positioned(
-              top: 260 + yOffset,
+              top: 300 + yOffset,
               left: 10,
               right: 10,
               child: Column(

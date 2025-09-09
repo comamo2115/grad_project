@@ -243,33 +243,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              // or 텍스트
-              const Center(child: Text('or', style: TextStyle(fontSize: 18))),
+              // // or 텍스트
+              // const Center(child: Text('or', style: TextStyle(fontSize: 18))),
 
-              const SizedBox(height: 20),
+              // const SizedBox(height: 20),
 
               // Google 로그인 버튼
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: 구글 로그인 연동 예정
-                  },
-                  icon: const Icon(Icons.g_mobiledata),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(40),
-                    ),
-                    side: const BorderSide(color: Color(0xff8e908e)),
-                  ),
-                ),
-              ),
-
+              // SizedBox(
+              //   width: double.infinity,
+              //   height: 50,
+              //   child: OutlinedButton.icon(
+              //     onPressed: () {
+              //       // TODO: 구글 로그인 연동 예정
+              //     },
+              //     icon: const Icon(Icons.g_mobiledata),
+              //     label: const Text(
+              //       'Sign in with Google',
+              //       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              //     ),
+              //     style: OutlinedButton.styleFrom(
+              //       shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(40),
+              //       ),
+              //       side: const BorderSide(color: Color(0xff8e908e)),
+              //     ),
+              //   ),
+              // ),
               const SizedBox(height: 30),
 
               // 회원가입 유도 텍스트
