@@ -40,6 +40,50 @@ class _ModifyScheduleScreenState extends State<ModifyScheduleScreen> {
   int? _entityId;
   Map<String, dynamic>? _initialSnapshot;
 
+  static const List<String> _planOptions = [
+    'Evening Party',
+    'Fine Dining',
+    'Fishing Trip',
+    'Formal Gala',
+    'Game Day at Stadium',
+    'Gardening',
+    'Gym Workout',
+    'Hiking',
+    'Home Office Work',
+    'Job Interview',
+    'Library Study',
+    'Meditation Retreat',
+    'Movie Night In',
+    'Morning Coffee Run',
+    'Museum Visit',
+    'Music Festival',
+    'Neighborhood Walk',
+    'Night Out with Friends',
+    'Office Meeting',
+    'Online Class',
+    'Opera Night',
+    'Outdoor Concert',
+    'Picnic in Park',
+    'Pottery Class',
+    'Public Speaking Event',
+    'Quick Grocery Run',
+    'Relaxing at Home',
+    'Religious Gathering',
+    'Road Trip',
+    'Running Errands',
+    'Shopping Spree',
+    'Ski Trip',
+    'Street Photography',
+    'Summer BBQ',
+    'Traditional Ceremony',
+    'Travel Day',
+    'University Lecture',
+    'Volunteering Event',
+    'Weekend Brunch',
+    'Wedding Ceremony',
+    'Yoga Class',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +104,41 @@ class _ModifyScheduleScreenState extends State<ModifyScheduleScreen> {
     _planCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
+  }
+
+  Widget _buildPlanDetailInput() {
+    return _StyledInput(
+      height: 56,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Autocomplete<String>(
+          optionsBuilder: (TextEditingValue value) {
+            final q = value.text.trim().toLowerCase();
+            if (q.isEmpty) return _planOptions;
+            return _planOptions.where((o) => o.toLowerCase().contains(q));
+          },
+          onSelected: (selection) {
+            _planCtrl.text = selection;
+            setState(() {});
+          },
+          fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+            controller.addListener(() {
+              _planCtrl.value = controller.value;
+              setState(() {});
+            });
+            return TextField(
+              controller: controller,
+              focusNode: focusNode,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: 'Search & select…',
+              ),
+            );
+          },
+          initialValue: TextEditingValue(text: _planCtrl.text),
+        ),
+      ),
+    );
   }
 
   // ---- formatter ----
@@ -546,20 +625,7 @@ class _ModifyScheduleScreenState extends State<ModifyScheduleScreen> {
                         ),
                       const SizedBox(height: 25),
                       const _LabelText('Plan detail'),
-                      _StyledInput(
-                        height: 56,
-                        child: TextField(
-                          controller: _planCtrl,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            hintText: 'Enter title...',
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 14,
-                            ),
-                          ),
-                        ),
-                      ),
+                      _buildPlanDetailInput(),
                       if (_showErrors && !_isPlanValid)
                         const _ErrorText('Please input a title.'),
                       const SizedBox(height: 25),

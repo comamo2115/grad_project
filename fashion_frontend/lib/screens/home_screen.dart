@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fashion_frontend/main.dart' show routeObserver;
 
 const String kOpenWeatherApiKey = 'YOUR_OPENWEATHER_API_KEY';
 const storage = FlutterSecureStorage();
@@ -42,10 +43,10 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  HomeScreenState createState() => HomeScreenState(); // ← 타입 이름 맞춤
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with RouteAware {
   bool isGenerated = false;
   bool _isLoading = false;
   String _errorMessage = '';
@@ -55,8 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Map<String, String>> outfitResults = [];
 
+  // 🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢server URL (ngrok 등으로 외부에서 접근 가능하도록 설정)🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢🟢
   static const String _apiUrl =
-      'https://49c5e891fd4b.ngrok-free.app/recommend_outfit';
+      'https://e4f221981748.ngrok-free.app/recommend_outfit';
 
   String _topCity = 'Locating...';
   int? _topCurrent;
@@ -74,6 +76,41 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadHomeTopWeather();
     _fetchUserName();
     _loadTodayEvent();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute) {
+      routeObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    debugPrint('[HomeScreen] didPopNext - refresh triggered');
+    refresh();
+  }
+
+  void refresh() async {
+    debugPrint("[HomeScreen] refresh() called");
+    await _loadHomeTopWeather();
+
+    final updatedEvent = await _fetchTodayEvent();
+    debugPrint("[HomeScreen] updatedEvent = $updatedEvent");
+    setState(() {
+      _todayEvent = updatedEvent;
+      isGenerated = false;
+      _errorMessage = '';
+      outfitResults.clear();
+    });
   }
 
   Future<void> _loadTodayEvent() async {
@@ -228,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
           map['id'] = map['custom_id'];
           map.remove('custom_id'); // もし不要なら消す
           map.remove('owner');
+          // map.remove('image');
         }
         return map;
       }).toList();
@@ -266,9 +304,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     if (res.statusCode == 200) {
       final List events = jsonDecode(res.body);
-      if (events.isEmpty) return "No schedule";
+      if (events.isEmpty) {
+        debugPrint("No events found for $todayStr");
+        return "No schedule";
+      }
+      debugPrint("Fetched event: ${events.first['title']}");
       return events.first['title'] ?? "No schedule";
     }
+    debugPrint("Failed to fetch events: ${res.statusCode}");
     return "No schedule";
   }
 
@@ -299,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️ MOCK ここから ⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️⭐️
     bool useMockWeather = true;
-    double mockTemperature = 15.0;
+    double mockTemperature = 5.0;
     String mockCondition = "Clear";
 
     // 실제 전송값 정의
@@ -334,11 +377,6 @@ class _HomeScreenState extends State<HomeScreen> {
     // ---------------- 전송 직전 로그 ----------------
     final closetIds = closet.map((c) => c["id"]).toList();
     print("=== Sending Data ===");
-    print("Event: $event");
-    print("Temperature: $sendTemp");
-    print("Condition: $sendCond");
-    print("Gender: $gender");
-    print("Closet IDs: $closetIds");
 
     final requestData = {
       "closet": closet,
@@ -347,6 +385,15 @@ class _HomeScreenState extends State<HomeScreen> {
       "condition": sendCond,
       "gender": gender,
     };
+    print(
+      json.encode({
+        "closet": closet.isNotEmpty ? [closet.first] : [],
+        "event": event,
+        "temperature": sendTemp,
+        "condition": sendCond,
+        "gender": gender,
+      }),
+    );
 
     try {
       final res = await http

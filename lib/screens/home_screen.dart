@@ -229,7 +229,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final token = await storage.read(key: "access_token");
     if (token == null) return "No schedule";
     final todayStr = DateTime.now().toIso8601String().split("T").first;
-    final url = Uri.parse("http://127.0.0.1:8000/api/events/?date=$todayStr");
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final url = Uri.parse(
+      "http://127.0.0.1:8000/api/events/?date=$todayStr&_ts=$now",
+    );
     final res = await http.get(
       url,
       headers: {"Authorization": "Bearer $token"},

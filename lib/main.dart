@@ -41,10 +41,10 @@ class MyApp extends StatelessWidget {
 
         // ❌ '/profile': (context) => const ProfileScreen(), ← 削除
         '/root': (context) => const BottomNavRoot(
-          home: HomeScreen(),
-          calendar: CalendarScreen(),
-          wardrobe: WardrobeScreen(),
-          profile: ProfileScreen(), // ✅ タブ専用
+          // home: HomeScreen(),
+          // calendar: CalendarScreen(),
+          // wardrobe: WardrobeScreen(),
+          // profile: ProfileScreen(), // ✅ タブ専用
         ),
       },
     );

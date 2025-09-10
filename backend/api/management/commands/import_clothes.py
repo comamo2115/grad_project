@@ -89,7 +89,7 @@ class Command(BaseCommand):
             return
 
         # CSV 読み込み & Clothes 登録
-        with open("test_scenarios/Sheet 11-Autobahn.csv", newline="", encoding="utf-8") as csvfile:
+        with open("test_scenarios/Sheet 12-Apfel.csv", newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 clothes = Clothes(
