@@ -14,6 +14,9 @@ import 'screens/signup_screen.dart';
 import 'screens/profile_screen.dart'; // ★ 프로필 화면 임포트
 import 'widgets/bottom_nav.dart'; // ★ BottomNavRoot 임포트
 
+final RouteObserver<ModalRoute<void>> routeObserver =
+    RouteObserver<ModalRoute<void>>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -32,6 +35,7 @@ class MyApp extends StatelessWidget {
 
       // ★ 앱 시작 시 스플래시 먼저 실행
       initialRoute: '/',
+      navigatorObservers: [routeObserver],
 
       routes: {
         '/': (context) => const SplashScreen(),
@@ -39,12 +43,11 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignupScreen(),
         '/weather': (context) => const WeatherScreen(),
 
-        // ❌ '/profile': (context) => const ProfileScreen(), ← 削除
         '/root': (context) => const BottomNavRoot(
-          home: HomeScreen(),
-          calendar: CalendarScreen(),
-          wardrobe: WardrobeScreen(),
-          profile: ProfileScreen(), // ✅ タブ専用
+          // home: HomeScreen(),
+          // calendar: CalendarScreen(),
+          // wardrobe: WardrobeScreen(),
+          // profile: ProfileScreen(),
         ),
       },
     );

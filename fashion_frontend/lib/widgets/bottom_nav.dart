@@ -1,7 +1,10 @@
 // bottom_nav.dart
 // ★ 주석은 한국어로 작성했습니다.
 import 'package:flutter/material.dart';
-import 'package:fashion_frontend/screens/profile_screen.dart'; // ★ 追加
+import 'package:fashion_frontend/screens/profile_screen.dart'; // ★ 추가
+import 'package:fashion_frontend/screens/home_screen.dart'; // ★ 추가
+import 'package:fashion_frontend/screens/calendar_screen.dart'; // ★ 추가
+import 'package:fashion_frontend/screens/wardrobe_screen.dart'; // ★ 추가
 
 /// ----------------------------------------------
 /// ★ 색상 상수 정의
@@ -50,6 +53,10 @@ class BottomNavRoot extends StatefulWidget {
 class _BottomNavRootState extends State<BottomNavRoot>
     implements BottomNavController {
   late int _currentIndex;
+  final GlobalKey<HomeScreenState> _homeScreenKey =
+      GlobalKey<HomeScreenState>();
+  late final HomeScreen _homeScreen;
+
   final _homeKey = GlobalKey<NavigatorState>();
   final _calendarKey = GlobalKey<NavigatorState>();
   final _wardrobeKey = GlobalKey<NavigatorState>();
@@ -62,6 +69,7 @@ class _BottomNavRootState extends State<BottomNavRoot>
     super.initState();
     _currentIndex = widget.initialIndex.clamp(0, 3);
     _navKeys = [_homeKey, _calendarKey, _wardrobeKey, _profileKey];
+    _homeScreen = HomeScreen(key: _homeScreenKey);
   }
 
   NavigatorState? get _currentNavigator => _navKeys[_currentIndex].currentState;
@@ -81,6 +89,12 @@ class _BottomNavRootState extends State<BottomNavRoot>
       if (nav != null && nav.canPop()) {
         nav.popUntil((route) => route.isFirst);
       }
+      // ★ Home 탭을 다시 누른 경우 리프레시
+      if (newIndex == 0) {
+        final state = _homeScreenKey.currentState;
+        debugPrint("[BottomNav] home tab tapped");
+        state?.refresh();
+      }
     } else {
       setState(() => _currentIndex = newIndex);
     }
@@ -99,16 +113,16 @@ class _BottomNavRootState extends State<BottomNavRoot>
     setState(() => _currentIndex = index);
   }
 
-  Widget _buildHome() => widget.home ?? const _HomePage();
-  Widget _buildCalendar() => widget.calendar ?? const _CalendarPage();
-  Widget _buildWardrobe() => widget.wardrobe ?? const _WardrobePage();
+  Widget _buildHome() => widget.home ?? _homeScreen;
+  Widget _buildCalendar() => widget.calendar ?? const CalendarScreen(); // ← 修正
+  Widget _buildWardrobe() => widget.wardrobe ?? const WardrobeScreen(); // ← 修正
   Widget _buildProfile() => widget.profile ?? const ProfileScreen();
 
   List<Widget> get _tabNavigators => [
-    _TabNavigator(navigatorKey: _homeKey, child: _buildHome()),
-    _TabNavigator(navigatorKey: _calendarKey, child: _buildCalendar()),
-    _TabNavigator(navigatorKey: _wardrobeKey, child: _buildWardrobe()),
-    _TabNavigator(navigatorKey: _profileKey, child: _buildProfile()),
+    _TabNavigator(navigatorKey: _homeKey, builder: _buildHome),
+    _TabNavigator(navigatorKey: _calendarKey, builder: _buildCalendar),
+    _TabNavigator(navigatorKey: _wardrobeKey, builder: _buildWardrobe),
+    _TabNavigator(navigatorKey: _profileKey, builder: _buildProfile),
   ];
 
   @override
@@ -161,16 +175,19 @@ class _BottomNavRootState extends State<BottomNavRoot>
 
 class _TabNavigator extends StatelessWidget {
   final GlobalKey<NavigatorState> navigatorKey;
-  final Widget child;
+  final Widget Function() builder;
 
-  const _TabNavigator({required this.navigatorKey, required this.child});
+  const _TabNavigator({required this.navigatorKey, required this.builder});
 
   @override
   Widget build(BuildContext context) {
     return Navigator(
       key: navigatorKey,
       onGenerateRoute: (settings) {
-        return MaterialPageRoute(builder: (_) => child, settings: settings);
+        return MaterialPageRoute(
+          builder: (_) => builder(), // ← builder() 호출
+          settings: settings,
+        );
       },
     );
   }
